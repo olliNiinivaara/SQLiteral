@@ -644,7 +644,7 @@ proc finalizeStatements(db: var SQLiteral) =
 
 proc close*(db: var SQLiteral) =
   ## Closes the database
-  if db.laststatementindex == 0: return
+  if db.laststatementindex == -1: return
   try:
     finalizeStatements(db)
     let rc = close(db.sqlite)
