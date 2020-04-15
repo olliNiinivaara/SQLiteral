@@ -60,7 +60,7 @@
 ## =========
 ## 
 ## sqlite3.c must be on compiler search path.
-## You can extract one from an amalgamation available at https://www.sqlite.org/download.html.
+## You can extract it from an amalgamation available at https://www.sqlite.org/download.html.
 ## 
 ## Compile command must contain these arguments:
 ## -d:staticSqlite --passL:-lpthread
@@ -104,7 +104,7 @@ type
     inreadonlymode: bool
     walmode: bool 
     maxsize: int    
-    partitions: array[100, int]
+    partitions: array[100, uint32]
     transactionlock: Lock
     Transaction: PStmt
     Commit: PStmt
@@ -245,8 +245,24 @@ proc getState*(db: var SQLiteral, partition: uint32 = 0): uint32 =
   ## Partitions use zero based-indexing, so first partition is partition 0.
   ## Maximum number of partitions is hard-coded to 100.
   assert(partition < 100, "partition out of bounds")
-  return db.partitions[partition].uint32
+  return db.partitions[partition]
 
+
+proc changeState*(db: var SQLiteral, partition: uint32 = 0): uint32 =
+  if db.inreadonlymode: return  
+  assert(partition < 100, "partition out of bounds")
+  var transaction = false
+  if not db.intransaction:
+    acquire(db.transactionlock)
+    db.intransaction = true
+    transaction = true
+  db.partitions[partition].inc 
+  if db.partitions[partition] > 2000000000: db.partitions[partition].dec(2000000000)
+  result = db.partitions[partition]
+  if transaction:
+    release(db.transactionlock)
+    db.intransaction = false
+  
 
 proc getInt*(prepared: PStmt, col: int32 = 0): int64 {.inline.} =
   ## Returns value of INTEGER -type column at given column index
@@ -433,7 +449,7 @@ proc exes*(db: SQLiteral, sql: string) =
   ## | Statements must be separated with empty lines that contain no characters, not even whitespace.
   for s in sql.split("\n\n"):
     if s.strip == "": continue
-    when defined(fulldebug): (echo "---";echo s)
+    when defined(fulldebug): echo s
     try:
       let prepared = db.prepareSql(s)
       db.checkRc(step(prepared))
@@ -496,8 +512,8 @@ template transaction*(db: var SQLiteral, statepartition: uint32, body: untyped) 
       db.intransaction = false
       raise ex
     finally:
-      db.partitions[statepartition].atomicInc 
-      if db.partitions[statepartition] > 2000000000: db.partitions[statepartition].atomicInc(-2000000000)  
+      db.partitions[statepartition].inc 
+      if db.partitions[statepartition] > 2000000000: db.partitions[statepartition].dec(2000000000)
       if db.intransaction:
         exec(db.Commit)
         db.intransaction = false
