@@ -114,14 +114,15 @@ function main() {
   inreadonlymode: bool
   walmode: bool
   maxsize: int
-  partitions: array[100, int]
+  partitions: array[100, uint32]
   transactionlock: Lock
+  preparedstatements: array[MaxStatements, PStmt]
+  laststatementindex: int
+  loggerproc: proc (sqliteral: SQLiteral; statement: string; errorcode: int) {.gcsafe,
+      raises: [].}
   Transaction: PStmt
   Commit: PStmt
-  Rollback: PStmt
-  Last_insert_rowid: PStmt
-  preparedstatements: array[MaxStatements, PStmt]
-  laststatementindex: int"><wbr />SQLiteral<span class="attachedType"></span></a></li>
+  Rollback: PStmt"><wbr />SQLiteral<span class="attachedType"></span></a></li>
   <li><a class="reference" href="#DbValue"
     title="DbValue = object
   case kind*: DbValueKind
@@ -178,6 +179,8 @@ function main() {
     title="`$`[T: DbValue](val: T): string"><wbr />`$`<span class="attachedType"></span></a></li>
   <li><a class="reference" href="#getState%2CSQLiteral%2Cuint32"
     title="getState(db: var SQLiteral; partition: uint32 = 0): uint32"><wbr />get<wbr />State<span class="attachedType">SQLiteral</span></a></li>
+  <li><a class="reference" href="#changeState%2CSQLiteral%2Cuint32"
+    title="changeState(db: var SQLiteral; partition: uint32 = 0): uint32"><wbr />change<wbr />State<span class="attachedType">SQLiteral</span></a></li>
   <li><a class="reference" href="#getInt%2CPStmt%2Cint32"
     title="getInt(prepared: PStmt; col: int32 = 0): int64"><wbr />get<wbr />Int<span class="attachedType"></span></a></li>
   <li><a class="reference" href="#getString%2CPStmt%2Cint32"
@@ -199,7 +202,7 @@ function main() {
   <li><a class="reference" href="#getTheString%2CSQLiteral%2Cstring"
     title="getTheString(db: SQLiteral; s: string): string"><wbr />get<wbr />The<wbr />String<span class="attachedType">SQLiteral</span></a></li>
   <li><a class="reference" href="#getLastInsertRowid%2CSQLiteral"
-    title="getLastInsertRowid(db: SQLiteral): int"><wbr />get<wbr />Last<wbr />Insert<wbr />Rowid<span class="attachedType">SQLiteral</span></a></li>
+    title="getLastInsertRowid(db: SQLiteral): int64"><wbr />get<wbr />Last<wbr />Insert<wbr />Rowid<span class="attachedType">SQLiteral</span></a></li>
   <li><a class="reference" href="#rowExists%2CPStmt%2Cvarargs%5BDbValue%2CtoDb%5D"
     title="rowExists(s: PStmt; params: varargs[DbValue, toDb]): bool"><wbr />row<wbr />Exists<span class="attachedType">DbValue</span></a></li>
   <li><a class="reference" href="#rowExists%2CSQLiteral%2Cstring"
@@ -209,13 +212,16 @@ function main() {
   <li><a class="reference" href="#exes%2CSQLiteral%2Cstring"
     title="exes(db: SQLiteral; sql: string)"><wbr />exes<span class="attachedType">SQLiteral</span></a></li>
   <li><a class="reference" href="#insert%2CSQLiteral%2CPStmt%2Cvarargs%5BDbValue%2CtoDb%5D"
-    title="insert(db: SQLiteral; preparedstatement: PStmt; params: varargs[DbValue, toDb]): int"><wbr />insert<span class="attachedType">SQLiteral</span></a></li>
+    title="insert(db: SQLiteral; preparedstatement: PStmt; params: varargs[DbValue, toDb]): int64"><wbr />insert<span class="attachedType">SQLiteral</span></a></li>
   <li><a class="reference" href="#update%2CSQLiteral%2Cstring%2Cstring%2CDbValue%2CDbValue"
     title="update(db: SQLiteral; sql: string; column: string; newvalue: DbValue; where: DbValue)"><wbr />update<span class="attachedType">SQLiteral</span></a></li>
   <li><a class="reference" href="#columnExists%2CSQLiteral%2Cstring%2Cstring"
     title="columnExists(db: SQLiteral; table: string; column: string): bool"><wbr />column<wbr />Exists<span class="attachedType">SQLiteral</span></a></li>
   <li><a class="reference" href="#isIntransaction%2CSQLiteral"
     title="isIntransaction(db: SQLiteral): bool"><wbr />is<wbr />Intransaction<span class="attachedType">SQLiteral</span></a></li>
+  <li><a class="reference" href="#setLogger%2CSQLiteral%2Cproc%28SQLiteral%2Cstring%2Cint%29"
+    title="setLogger(db: var SQLiteral; logger: proc (sqliteral: SQLiteral; statement: string;
+                                      errorcode: int) {.gcsafe, raises: [].})"><wbr />set<wbr />Logger<span class="attachedType">SQLiteral</span></a></li>
   <li><a class="reference" href="#openDatabase%2CSQLiteral%2Cstring%2Cstring%2Ctypedesc%5B%5D%2Cint"
     title="openDatabase(db: var SQLiteral; dbname: string; schema: string;
              Statements: typedesc[enum]; maxKbSize = 0; wal = true)"><wbr />open<wbr />Database<span class="attachedType">SQLiteral</span></a></li>
@@ -245,8 +251,8 @@ function main() {
 <li>
   <a class="reference reference-toplevel" href="#18" id="68">Templates</a>
   <ul class="simple simple-toc-section">
-      <li><a class="reference" href="#checkRc.t%2Cint"
-    title="checkRc(resultcode: int)"><wbr />check<wbr />Rc<span class="attachedType"></span></a></li>
+      <li><a class="reference" href="#checkRc.t%2CSQLiteral%2Cint"
+    title="checkRc(db: SQLiteral; resultcode: int)"><wbr />check<wbr />Rc<span class="attachedType">SQLiteral</span></a></li>
   <li><a class="reference" href="#withRow.t%2CSQLiteral%2Cstring%2Cuntyped%2Cuntyped"
     title="withRow(db: SQLiteral; sql: string; row, body: untyped)"><wbr />with<wbr />Row<span class="attachedType">SQLiteral</span></a></li>
   <li><a class="reference" href="#withRowOr.t%2CSQLiteral%2Cstring%2Cuntyped%2Cuntyped%2Cuntyped"
@@ -288,6 +294,7 @@ function main() {
 
 <span class="Keyword">var</span> <span class="Identifier">db</span><span class="Punctuation">:</span> <span class="Identifier">SQLiteral</span>
 
+
 <span class="Keyword">proc</span> <span class="Identifier">operate</span><span class="Punctuation">(</span><span class="Punctuation">)</span> <span class="Operator">=</span>
   <span class="Punctuation">{</span><span class="Operator">.</span><span class="Identifier">gcsafe</span><span class="Operator">.</span><span class="Punctuation">}</span><span class="Punctuation">:</span>
     <span class="Identifier">echo</span> <span class="StringLit">&quot;startstate: &quot;</span><span class="Punctuation">,</span> <span class="Identifier">db</span><span class="Operator">.</span><span class="Identifier">getState</span><span class="Punctuation">(</span><span class="Punctuation">)</span>
@@ -312,6 +319,10 @@ function main() {
     <span class="Identifier">echo</span> <span class="StringLit">&quot;endstate: &quot;</span><span class="Punctuation">,</span> <span class="Identifier">db</span><span class="Operator">.</span><span class="Identifier">getState</span><span class="Punctuation">(</span><span class="Punctuation">)</span>
 
 
+<span class="Keyword">when</span> <span class="Keyword">not</span> <span class="Identifier">defined</span><span class="Punctuation">(</span><span class="Identifier">release</span><span class="Punctuation">)</span><span class="Punctuation">:</span>
+  <span class="Keyword">proc</span> <span class="Identifier">logSql</span><span class="Punctuation">(</span><span class="Identifier">db</span><span class="Punctuation">:</span> <span class="Identifier">SQLiteral</span><span class="Punctuation">,</span> <span class="Identifier">msg</span><span class="Punctuation">:</span> <span class="Identifier">string</span><span class="Punctuation">,</span> <span class="Identifier">error</span><span class="Punctuation">:</span> <span class="Identifier">int</span><span class="Punctuation">)</span> <span class="Operator">=</span> <span class="Identifier">echo</span> <span class="Identifier">msg</span>
+  <span class="Identifier">db</span><span class="Operator">.</span><span class="Identifier">setLogger</span><span class="Punctuation">(</span><span class="Identifier">logSql</span><span class="Punctuation">)</span>
+
 <span class="Identifier">db</span><span class="Operator">.</span><span class="Identifier">openDatabase</span><span class="Punctuation">(</span><span class="StringLit">&quot;testdatabase&quot;</span><span class="Punctuation">,</span> <span class="Identifier">Schema</span><span class="Punctuation">,</span> <span class="Identifier">SqlStatements</span><span class="Punctuation">)</span>
 <span class="Identifier">db</span><span class="Operator">.</span><span class="Identifier">about</span><span class="Punctuation">(</span><span class="Punctuation">)</span>
 <span class="Keyword">var</span> <span class="Identifier">threads</span><span class="Punctuation">:</span> <span class="Identifier">array</span><span class="Punctuation">[</span><span class="DecNumber">5</span><span class="Punctuation">,</span> <span class="Identifier">Thread</span><span class="Punctuation">[</span><span class="Identifier">void</span><span class="Punctuation">]</span><span class="Punctuation">]</span>
@@ -319,17 +330,12 @@ function main() {
 <span class="Identifier">joinThreads</span><span class="Punctuation">(</span><span class="Identifier">threads</span><span class="Punctuation">)</span>
 <span class="Identifier">db</span><span class="Operator">.</span><span class="Identifier">optimize</span><span class="Punctuation">(</span><span class="Punctuation">)</span>
 <span class="Identifier">db</span><span class="Operator">.</span><span class="Identifier">close</span><span class="Punctuation">(</span><span class="Punctuation">)</span></pre>
-<h1><a class="toc-backref" id="compiling" href="#compiling">Compiling</a></h1><p>sqlite3.c must be on compiler search path. You can extract one from an amalgamation available at <a class="reference external" href="https://www.sqlite.org/download.html">https://www.sqlite.org/download.html</a>.</p>
+<h1><a class="toc-backref" id="compiling" href="#compiling">Compiling</a></h1><p>sqlite3.c must be on compiler search path. You can extract it from an amalgamation available at <a class="reference external" href="https://www.sqlite.org/download.html">https://www.sqlite.org/download.html</a>.</p>
 <p>Compile command must contain these arguments:</p>
 <table frame="void"><tr><th align="left">-d:staticSqlite --passL:-lpthread</th><td align="left"></td>
 </tr>
-</table><p>Opening and closing echoes a notice unless following argument is given:</p>
-<table frame="void"><tr><th align="left">-d:release</th><td align="left"></td>
-</tr>
-</table><p>To get debug info about executed sql statements and their parameters, add following argument:</p>
-<table frame="void"><tr><th align="left">-d:fulldebug</th><td align="left"></td>
-</tr>
-</table><p>An example:<br /><tt class="docutils literal"><span class="pre">nim c -r --threads:on -d:fulldebug -d:staticSqlite --passL:-lpthread myprogram.nim</span></tt><br /></p>
+</table><p>An example: <tt class="docutils literal"><span class="pre">nim c -r --threads:on -d:staticSqlite --passL:-lpthread myprogram.nim</span></tt></p>
+
 <h1><a class="toc-backref" id="see-also" href="#see-also">See also</a></h1><p><a class="reference external" href="https://nim-lang.org/docs/db_sqlite.html">sqlite</a><br /><a class="reference external" href="https://gulpf.github.io/tiny_sqlite/tiny_sqlite.html">tiny_sqlite</a><br /></p></p>
   <div class="section" id="7">
 <h1><a class="toc-backref" href="#7">Types</a></h1>
@@ -351,14 +357,15 @@ function main() {
   <span class="Identifier">inreadonlymode</span><span class="Other">:</span> <span class="Identifier">bool</span>
   <span class="Identifier">walmode</span><span class="Other">:</span> <span class="Identifier">bool</span>
   <span class="Identifier">maxsize</span><span class="Other">:</span> <span class="Identifier">int</span>
-  <span class="Identifier">partitions</span><span class="Other">:</span> <span class="Identifier">array</span><span class="Other">[</span><span class="DecNumber">100</span><span class="Other">,</span> <span class="Identifier">int</span><span class="Other">]</span>
+  <span class="Identifier">partitions</span><span class="Other">:</span> <span class="Identifier">array</span><span class="Other">[</span><span class="DecNumber">100</span><span class="Other">,</span> <span class="Identifier">uint32</span><span class="Other">]</span>
   <span class="Identifier">transactionlock</span><span class="Other">:</span> <span class="Identifier">Lock</span>
+  <span class="Identifier">preparedstatements</span><span class="Other">:</span> <span class="Identifier">array</span><span class="Other">[</span><span class="Identifier">MaxStatements</span><span class="Other">,</span> <span class="Identifier">PStmt</span><span class="Other">]</span>
+  <span class="Identifier">laststatementindex</span><span class="Other">:</span> <span class="Identifier">int</span>
+  <span class="Identifier">loggerproc</span><span class="Other">:</span> <span class="Keyword">proc</span> <span class="Other">(</span><span class="Identifier">sqliteral</span><span class="Other">:</span> <a href="sqliteral.html#SQLiteral"><span class="Identifier">SQLiteral</span></a><span class="Other">;</span> <span class="Identifier">statement</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span> <span class="Identifier">errorcode</span><span class="Other">:</span> <span class="Identifier">int</span><span class="Other">)</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma"><span class="Identifier">gcsafe</span><span class="Other">,</span>
+      <span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span><span class="Other">.}</span></span>
   <span class="Identifier">Transaction</span><span class="Other">:</span> <span class="Identifier">PStmt</span>
   <span class="Identifier">Commit</span><span class="Other">:</span> <span class="Identifier">PStmt</span>
   <span class="Identifier">Rollback</span><span class="Other">:</span> <span class="Identifier">PStmt</span>
-  <span class="Identifier">Last_insert_rowid</span><span class="Other">:</span> <span class="Identifier">PStmt</span>
-  <span class="Identifier">preparedstatements</span><span class="Other">:</span> <span class="Identifier">array</span><span class="Other">[</span><span class="Identifier">MaxStatements</span><span class="Other">,</span> <span class="Identifier">PStmt</span><span class="Other">]</span>
-  <span class="Identifier">laststatementindex</span><span class="Other">:</span> <span class="Identifier">int</span>
 </pre></dt>
 <dd>
 
@@ -506,6 +513,13 @@ Creates a zero-copy view to a substring of existing string
 Returns a number that atomically changes on every transaction targeting the given partition. Clients can use this number to check if their local data is up-to-date or a resync is needed. Partitions use zero based-indexing, so first partition is partition 0. Maximum number of partitions is hard-coded to 100.
 
 </dd>
+<a id="changeState,SQLiteral,uint32"></a>
+<dt><pre><span class="Keyword">proc</span> <a href="#changeState%2CSQLiteral%2Cuint32"><span class="Identifier">changeState</span></a><span class="Other">(</span><span class="Identifier">db</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="sqliteral.html#SQLiteral"><span class="Identifier">SQLiteral</span></a><span class="Other">;</span> <span class="Identifier">partition</span><span class="Other">:</span> <span class="Identifier">uint32</span> <span class="Other">=</span> <span class="DecNumber">0</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">uint32</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
+<dd>
+
+
+
+</dd>
 <a id="getInt,PStmt,int32"></a>
 <dt><pre><span class="Keyword">proc</span> <a href="#getInt%2CPStmt%2Cint32"><span class="Identifier">getInt</span></a><span class="Other">(</span><span class="Identifier">prepared</span><span class="Other">:</span> <span class="Identifier">PStmt</span><span class="Other">;</span> <span class="Identifier">col</span><span class="Other">:</span> <span class="Identifier">int32</span> <span class="Other">=</span> <span class="DecNumber">0</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">int64</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma"><span class="Identifier">inline</span><span class="Other">,</span> <span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
 <dd>
@@ -543,7 +557,7 @@ Returns value of BLOB -type column at given column index
 </dd>
 <a id="prepareSql,SQLiteral,cstring"></a>
 <dt><pre><span class="Keyword">proc</span> <a href="#prepareSql%2CSQLiteral%2Ccstring"><span class="Identifier">prepareSql</span></a><span class="Other">(</span><span class="Identifier">db</span><span class="Other">:</span> <a href="sqliteral.html#SQLiteral"><span class="Identifier">SQLiteral</span></a><span class="Other">;</span> <span class="Identifier">sql</span><span class="Other">:</span> <span class="Identifier">cstring</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">PStmt</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma"><span class="Identifier">inline</span><span class="Other">,</span> <span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">SQLError</span><span class="Other">]</span><span class="Other">,</span>
-    <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
+    <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
 <dd>
 
 Prepares a cstring into an executable statement
@@ -558,7 +572,8 @@ Prepares a cstring into an executable statement
 
 </dd>
 <a id="getTheInt,SQLiteral,string"></a>
-<dt><pre><span class="Keyword">proc</span> <a href="#getTheInt%2CSQLiteral%2Cstring"><span class="Identifier">getTheInt</span></a><span class="Other">(</span><span class="Identifier">db</span><span class="Other">:</span> <a href="sqliteral.html#SQLiteral"><span class="Identifier">SQLiteral</span></a><span class="Other">;</span> <span class="Identifier">s</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">int64</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma"><span class="Identifier">inline</span><span class="Other">,</span> <span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">SQLError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
+<dt><pre><span class="Keyword">proc</span> <a href="#getTheInt%2CSQLiteral%2Cstring"><span class="Identifier">getTheInt</span></a><span class="Other">(</span><span class="Identifier">db</span><span class="Other">:</span> <a href="sqliteral.html#SQLiteral"><span class="Identifier">SQLiteral</span></a><span class="Other">;</span> <span class="Identifier">s</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">int64</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma"><span class="Identifier">inline</span><span class="Other">,</span> <span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">SQLError</span><span class="Other">,</span> <span class="Identifier">SQLError</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
 <dd>
 
 <p>Dynamically prepares, executes and finalizes given query and returns value of INTEGER -type column at column index 0 of first result row.<br />If query does not return any rows, returns -2147483647 (low(int32) + 1).<br /></p>
@@ -573,15 +588,15 @@ Prepares a cstring into an executable statement
 
 </dd>
 <a id="getTheString,SQLiteral,string"></a>
-<dt><pre><span class="Keyword">proc</span> <a href="#getTheString%2CSQLiteral%2Cstring"><span class="Identifier">getTheString</span></a><span class="Other">(</span><span class="Identifier">db</span><span class="Other">:</span> <a href="sqliteral.html#SQLiteral"><span class="Identifier">SQLiteral</span></a><span class="Other">;</span> <span class="Identifier">s</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">string</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma"><span class="Identifier">inline</span><span class="Other">,</span> <span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">SQLError</span><span class="Other">]</span><span class="Other">,</span>
-    <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
+<dt><pre><span class="Keyword">proc</span> <a href="#getTheString%2CSQLiteral%2Cstring"><span class="Identifier">getTheString</span></a><span class="Other">(</span><span class="Identifier">db</span><span class="Other">:</span> <a href="sqliteral.html#SQLiteral"><span class="Identifier">SQLiteral</span></a><span class="Other">;</span> <span class="Identifier">s</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">string</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma"><span class="Identifier">inline</span><span class="Other">,</span>
+    <span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">SQLError</span><span class="Other">,</span> <span class="Identifier">SQLError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
 <dd>
 
 <p>Dynamically prepares, executes and finalizes given query and returns value of TEXT -type column at column index 0 of first result row.<br />If query does not return any rows, returns empty string.<br /></p>
 
 </dd>
 <a id="getLastInsertRowid,SQLiteral"></a>
-<dt><pre><span class="Keyword">proc</span> <a href="#getLastInsertRowid%2CSQLiteral"><span class="Identifier">getLastInsertRowid</span></a><span class="Other">(</span><span class="Identifier">db</span><span class="Other">:</span> <a href="sqliteral.html#SQLiteral"><span class="Identifier">SQLiteral</span></a><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">int</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma"><span class="Identifier">inline</span><span class="Other">,</span> <span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
+<dt><pre><span class="Keyword">proc</span> <a href="#getLastInsertRowid%2CSQLiteral"><span class="Identifier">getLastInsertRowid</span></a><span class="Other">(</span><span class="Identifier">db</span><span class="Other">:</span> <a href="sqliteral.html#SQLiteral"><span class="Identifier">SQLiteral</span></a><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">int64</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma"><span class="Identifier">inline</span><span class="Other">,</span> <span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
 <dd>
 
 <a class="reference external" href="https://www.sqlite.org/c3ref/last_insert_rowid.html">https://www.sqlite.org/c3ref/last_insert_rowid.html</a>
@@ -596,7 +611,8 @@ Returns true if query returns any rows
 
 </dd>
 <a id="rowExists,SQLiteral,string"></a>
-<dt><pre><span class="Keyword">proc</span> <a href="#rowExists%2CSQLiteral%2Cstring"><span class="Identifier">rowExists</span></a><span class="Other">(</span><span class="Identifier">db</span><span class="Other">:</span> <a href="sqliteral.html#SQLiteral"><span class="Identifier">SQLiteral</span></a><span class="Other">;</span> <span class="Identifier">sql</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">bool</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma"><span class="Identifier">inline</span><span class="Other">,</span> <span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">SQLError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
+<dt><pre><span class="Keyword">proc</span> <a href="#rowExists%2CSQLiteral%2Cstring"><span class="Identifier">rowExists</span></a><span class="Other">(</span><span class="Identifier">db</span><span class="Other">:</span> <a href="sqliteral.html#SQLiteral"><span class="Identifier">SQLiteral</span></a><span class="Other">;</span> <span class="Identifier">sql</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">bool</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma"><span class="Identifier">inline</span><span class="Other">,</span> <span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">SQLError</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
 <dd>
 
 Returns true if query returns any rows
@@ -611,14 +627,14 @@ Executes given prepared statement
 
 </dd>
 <a id="exes,SQLiteral,string"></a>
-<dt><pre><span class="Keyword">proc</span> <a href="#exes%2CSQLiteral%2Cstring"><span class="Identifier">exes</span></a><span class="Other">(</span><span class="Identifier">db</span><span class="Other">:</span> <a href="sqliteral.html#SQLiteral"><span class="Identifier">SQLiteral</span></a><span class="Other">;</span> <span class="Identifier">sql</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">)</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
+<dt><pre><span class="Keyword">proc</span> <a href="#exes%2CSQLiteral%2Cstring"><span class="Identifier">exes</span></a><span class="Other">(</span><span class="Identifier">db</span><span class="Other">:</span> <a href="sqliteral.html#SQLiteral"><span class="Identifier">SQLiteral</span></a><span class="Other">;</span> <span class="Identifier">sql</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">)</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">SQLError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
 <dd>
 
-<p>Executes given sql statements.<br />Statements must be separated with empty lines that contain no characters, not even whitespace.<br /></p>
+<p>Prepares, executes and finalizes given semicolon-separated sql statements.<br /></p>
 
 </dd>
 <a id="insert,SQLiteral,PStmt,varargs[DbValue,toDb]"></a>
-<dt><pre><span class="Keyword">proc</span> <a href="#insert%2CSQLiteral%2CPStmt%2Cvarargs%5BDbValue%2CtoDb%5D"><span class="Identifier">insert</span></a><span class="Other">(</span><span class="Identifier">db</span><span class="Other">:</span> <a href="sqliteral.html#SQLiteral"><span class="Identifier">SQLiteral</span></a><span class="Other">;</span> <span class="Identifier">preparedstatement</span><span class="Other">:</span> <span class="Identifier">PStmt</span><span class="Other">;</span> <span class="Identifier">params</span><span class="Other">:</span> <span class="Identifier">varargs</span><span class="Other">[</span><a href="sqliteral.html#DbValue"><span class="Identifier">DbValue</span></a><span class="Other">,</span> <span class="Identifier">toDb</span><span class="Other">]</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">int</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma">
+<dt><pre><span class="Keyword">proc</span> <a href="#insert%2CSQLiteral%2CPStmt%2Cvarargs%5BDbValue%2CtoDb%5D"><span class="Identifier">insert</span></a><span class="Other">(</span><span class="Identifier">db</span><span class="Other">:</span> <a href="sqliteral.html#SQLiteral"><span class="Identifier">SQLiteral</span></a><span class="Other">;</span> <span class="Identifier">preparedstatement</span><span class="Other">:</span> <span class="Identifier">PStmt</span><span class="Other">;</span> <span class="Identifier">params</span><span class="Other">:</span> <span class="Identifier">varargs</span><span class="Other">[</span><a href="sqliteral.html#DbValue"><span class="Identifier">DbValue</span></a><span class="Other">,</span> <span class="Identifier">toDb</span><span class="Other">]</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">int64</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma">
     <span class="Identifier">inline</span><span class="Other">,</span> <span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">SQLError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
 <dd>
 
@@ -627,7 +643,7 @@ Executes given prepared statement
 </dd>
 <a id="update,SQLiteral,string,string,DbValue,DbValue"></a>
 <dt><pre><span class="Keyword">proc</span> <a href="#update%2CSQLiteral%2Cstring%2Cstring%2CDbValue%2CDbValue"><span class="Identifier">update</span></a><span class="Other">(</span><span class="Identifier">db</span><span class="Other">:</span> <a href="sqliteral.html#SQLiteral"><span class="Identifier">SQLiteral</span></a><span class="Other">;</span> <span class="Identifier">sql</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span> <span class="Identifier">column</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span> <span class="Identifier">newvalue</span><span class="Other">:</span> <a href="sqliteral.html#DbValue"><span class="Identifier">DbValue</span></a><span class="Other">;</span> <span class="Identifier">where</span><span class="Other">:</span> <a href="sqliteral.html#DbValue"><span class="Identifier">DbValue</span></a><span class="Other">)</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma">
-    <span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">Exception</span><span class="Other">,</span> <span class="Identifier">SQLError</span><span class="Other">,</span> <span class="Identifier">SQLError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
+    <span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">Exception</span><span class="Other">,</span> <span class="Identifier">SQLError</span><span class="Other">,</span> <span class="Identifier">SQLError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
 <dd>
 
 <p>Dynamically constructs, prepares, executes and finalizes given update query.<br />Update must target one column and WHERE -clause must contain one value.<br />For security and performance reasons, this proc should be used with caution.<br /></p>
@@ -635,7 +651,7 @@ Executes given prepared statement
 </dd>
 <a id="columnExists,SQLiteral,string,string"></a>
 <dt><pre><span class="Keyword">proc</span> <a href="#columnExists%2CSQLiteral%2Cstring%2Cstring"><span class="Identifier">columnExists</span></a><span class="Other">(</span><span class="Identifier">db</span><span class="Other">:</span> <a href="sqliteral.html#SQLiteral"><span class="Identifier">SQLiteral</span></a><span class="Other">;</span> <span class="Identifier">table</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span> <span class="Identifier">column</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">bool</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma">
-    <span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">Exception</span><span class="Other">,</span> <span class="Identifier">SQLError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
+    <span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">Exception</span><span class="Other">,</span> <span class="Identifier">SQLError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
 <dd>
 
 Returns true if given column exists in given table
@@ -646,6 +662,14 @@ Returns true if given column exists in given table
 <dd>
 
 
+
+</dd>
+<a id="setLogger,SQLiteral,proc(SQLiteral,string,int)"></a>
+<dt><pre><span class="Keyword">proc</span> <a href="#setLogger%2CSQLiteral%2Cproc%28SQLiteral%2Cstring%2Cint%29"><span class="Identifier">setLogger</span></a><span class="Other">(</span><span class="Identifier">db</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="sqliteral.html#SQLiteral"><span class="Identifier">SQLiteral</span></a><span class="Other">;</span> <span class="Identifier">logger</span><span class="Other">:</span> <span class="Keyword">proc</span> <span class="Other">(</span><span class="Identifier">sqliteral</span><span class="Other">:</span> <a href="sqliteral.html#SQLiteral"><span class="Identifier">SQLiteral</span></a><span class="Other">;</span> <span class="Identifier">statement</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span>
+    <span class="Identifier">errorcode</span><span class="Other">:</span> <span class="Identifier">int</span><span class="Other">)</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma"><span class="Identifier">gcsafe</span><span class="Other">,</span> <span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span><span class="Other">.}</span></span><span class="Other">)</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
+<dd>
+
+doc missing
 
 </dd>
 <a id="openDatabase,SQLiteral,string,string,typedesc[],int"></a>
@@ -674,7 +698,8 @@ Returns the given prepared statement
 
 </dd>
 <a id="setReadonly,SQLiteral,bool"></a>
-<dt><pre><span class="Keyword">proc</span> <a href="#setReadonly%2CSQLiteral%2Cbool"><span class="Identifier">setReadonly</span></a><span class="Other">(</span><span class="Identifier">db</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="sqliteral.html#SQLiteral"><span class="Identifier">SQLiteral</span></a><span class="Other">;</span> <span class="Identifier">readonly</span><span class="Other">:</span> <span class="Identifier">bool</span><span class="Other">)</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
+<dt><pre><span class="Keyword">proc</span> <a href="#setReadonly%2CSQLiteral%2Cbool"><span class="Identifier">setReadonly</span></a><span class="Other">(</span><span class="Identifier">db</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="sqliteral.html#SQLiteral"><span class="Identifier">SQLiteral</span></a><span class="Other">;</span> <span class="Identifier">readonly</span><span class="Other">:</span> <span class="Identifier">bool</span><span class="Other">)</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">SQLError</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
 <dd>
 
 <p>When in readonly mode:</p>
@@ -686,7 +711,7 @@ Returns the given prepared statement
 </dd>
 <a id="optimize,SQLiteral"></a>
 <dt><pre><span class="Keyword">proc</span> <a href="#optimize%2CSQLiteral"><span class="Identifier">optimize</span></a><span class="Other">(</span><span class="Identifier">db</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="sqliteral.html#SQLiteral"><span class="Identifier">SQLiteral</span></a><span class="Other">;</span> <span class="Identifier">pagesize</span> <span class="Other">=</span> <span class="Operator">-</span><span class="DecNumber">1</span><span class="Other">;</span> <span class="Identifier">walautocheckpoint</span> <span class="Other">=</span> <span class="Operator">-</span><span class="DecNumber">1</span><span class="Other">)</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma">
-    <span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
+    <span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">SQLError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
 <dd>
 
 <p>Vacuums and optimizes the database.</p>
@@ -695,14 +720,15 @@ Returns the given prepared statement
 
 </dd>
 <a id="about,SQLiteral"></a>
-<dt><pre><span class="Keyword">proc</span> <a href="#about%2CSQLiteral"><span class="Identifier">about</span></a><span class="Other">(</span><span class="Identifier">db</span><span class="Other">:</span> <a href="sqliteral.html#SQLiteral"><span class="Identifier">SQLiteral</span></a><span class="Other">)</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">SQLError</span><span class="Other">,</span> <span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">OSError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">ReadIOEffect</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
+<dt><pre><span class="Keyword">proc</span> <a href="#about%2CSQLiteral"><span class="Identifier">about</span></a><span class="Other">(</span><span class="Identifier">db</span><span class="Other">:</span> <a href="sqliteral.html#SQLiteral"><span class="Identifier">SQLiteral</span></a><span class="Other">)</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">SQLError</span><span class="Other">,</span> <span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">OSError</span><span class="Other">]</span><span class="Other">,</span>
+                         <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">,</span> <span class="Identifier">ReadIOEffect</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
 <dd>
 
 Echoes some info about the database
 
 </dd>
 <a id="close,SQLiteral"></a>
-<dt><pre><span class="Keyword">proc</span> <a href="#close%2CSQLiteral"><span class="Identifier">close</span></a><span class="Other">(</span><span class="Identifier">db</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="sqliteral.html#SQLiteral"><span class="Identifier">SQLiteral</span></a><span class="Other">)</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
+<dt><pre><span class="Keyword">proc</span> <a href="#close%2CSQLiteral"><span class="Identifier">close</span></a><span class="Other">(</span><span class="Identifier">db</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="sqliteral.html#SQLiteral"><span class="Identifier">SQLiteral</span></a><span class="Other">)</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
 <dd>
 
 Closes the database
@@ -726,8 +752,8 @@ Iterates over the query results
 <div class="section" id="18">
 <h1><a class="toc-backref" href="#18">Templates</a></h1>
 <dl class="item">
-<a id="checkRc.t,int"></a>
-<dt><pre><span class="Keyword">template</span> <a href="#checkRc.t%2Cint"><span class="Identifier">checkRc</span></a><span class="Other">(</span><span class="Identifier">resultcode</span><span class="Other">:</span> <span class="Identifier">int</span><span class="Other">)</span></pre></dt>
+<a id="checkRc.t,SQLiteral,int"></a>
+<dt><pre><span class="Keyword">template</span> <a href="#checkRc.t%2CSQLiteral%2Cint"><span class="Identifier">checkRc</span></a><span class="Other">(</span><span class="Identifier">db</span><span class="Other">:</span> <a href="sqliteral.html#SQLiteral"><span class="Identifier">SQLiteral</span></a><span class="Other">;</span> <span class="Identifier">resultcode</span><span class="Other">:</span> <span class="Identifier">int</span><span class="Other">)</span></pre></dt>
 <dd>
 
 Raises SQLError if resultcode notin [SQLITE_OK, SQLITE_ROW, SQLITE_DONE] <a class="reference external" href="https://www.sqlite.org/rescode.html">https://www.sqlite.org/rescode.html</a>
@@ -792,7 +818,7 @@ Executes transaction that targets state partition 0
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br/>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2020-04-14 16:23:36 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2020-04-24 11:12:29 UTC</small>
       </div>
     </div>
   </div>
