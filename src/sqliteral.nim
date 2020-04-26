@@ -214,7 +214,8 @@ proc `$`*[T: DbValue](val: T): string {.inline.} =
   of sqliteBlob: cast[string](val.blobVal)
 
 
-proc bindParams(sql: PStmt, params: varargs[DbValue]): int {.inline.} =
+proc bindParams*(sql: PStmt, params: varargs[DbValue]): int {.inline.} =
+  # public only becuse of Nim compiler...
   var idx = 1.int32
   for value in params:
     result =
@@ -437,7 +438,7 @@ template withRow*(db: SQLiteral, statement: enum, params: varargs[DbValue, toDb]
   ## | The code block will be executed only if query returns a row.
   let s = db.preparedstatements[ord(statement)]
   defer: discard sqlite3.reset(s)
-  # checkRc(db, bindParams(s, params))
+  checkRc(db, bindParams(s, params))
   if(unlikely) db.loggerproc != nil: db.doLog($statement, params)
   if step(s) == SQLITE_ROW:
     var row {.inject.} = s
