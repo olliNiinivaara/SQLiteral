@@ -1,5 +1,8 @@
 const SQLiteralVersion = "1.0.0"
 
+# (C) Olli Niinivaara, 2020
+# MIT Licensed
+
 ## A high level SQLite API with support for multi-threading, prepared statements, proper typing, zero-copy string views,
 ## state syncing, debugging executed statements, static binding to sqlite3.c of your choice, optimizing, and more.
 ## 
@@ -81,7 +84,7 @@ const SQLiteralVersion = "1.0.0"
 ## 
 
 import sqlite3
-export PStmt, errmsg, finalize
+export PStmt, errmsg, reset, step, finalize, SQLITE_ROW
 import Locks
 from os import getFileSize
 from strutils import strip, split, replace # Sic
@@ -314,7 +317,8 @@ iterator rows*(db: SQLiteral, statement: enum, params: varargs[DbValue, toDb]): 
 
 iterator rows*(db: SQLiteral, pstatement: Pstmt, params: varargs[DbValue, toDb]): PStmt =
   ## Iterates over the query results
-  ## Note: does not log
+  ## 
+  ## Note: this one doesn't log, because the original sql string is not available
   checkRc(db, bindParams(pstatement, params))
   defer: discard sqlite3.reset(pstatement)
   while step(pstatement) == SQLITE_ROW: yield pstatement
@@ -379,11 +383,6 @@ proc getTheString*(db: SQLiteral, s: string): string {.inline.} =
 proc getLastInsertRowid*(db: SQLiteral): int64 {.inline.} =
   ## https://www.sqlite.org/c3ref/last_insert_rowid.html
   return db.sqlite.last_insert_rowid()
-  #[ https://www.sqlite.org/c3ref/last_insert_rowid.html
-  defer: discard sqlite3.reset(db.Last_insert_rowid)
-  when defined(fulldebug): echo "SELECT last_insert_rowid()"
-  discard step(db.Last_insert_rowid)
-  db.Last_insert_rowid.getInt(0).int]#
 
 
 proc rowExists*(db: SQLiteral, statement: enum, params: varargs[DbValue, toDb]): bool {.inline.} =
@@ -421,6 +420,15 @@ template withRowOr*(db: SQLiteral, sql: string, row, body1, body2: untyped) =
   ## | Dynamically prepares and finalizes an sql query.
   ## | Name for the resulting prepared statement is given with row parameter.  
   ## | First block will be executed if query returns a row, otherwise the second block.
+  ## **Example:**
+  ## 
+  ## .. code-block:: Nim
+  ## 
+  ##  db.withRowOr("SELECT (1) FROM sqlite_master", rowname):
+  ##    echo "database has some tables because first column = ", rowname.getInt(0)
+  ##  do:
+  ##    echo "we have a fresh database"
+  ## 
   let preparedstatement = db.prepareSql(sql.cstring)
   try:
     if(unlikely) db.loggerproc != nil: db.loggerproc(db, sql, 0)
@@ -437,7 +445,7 @@ template withRow*(db: SQLiteral, statement: enum, params: varargs[DbValue, toDb]
   ## | For convenience, an alias for the prepared statement is given with row parameter.
   ## | The code block will be executed only if query returns a row.
   let s = db.preparedstatements[ord(statement)]
-  defer: discard sqlite3.reset(s)
+  defer: discard reset(s)
   checkRc(db, bindParams(s, params))
   if(unlikely) db.loggerproc != nil: db.doLog($statement, params)
   if step(s) == SQLITE_ROW:
@@ -445,23 +453,10 @@ template withRow*(db: SQLiteral, statement: enum, params: varargs[DbValue, toDb]
     body
     
 
-
 template withRowOr*(db: SQLiteral, statement: enum, params: varargs[DbValue, toDb], row, body1, body2: untyped) =
   ## | Executes given prepared statement.
   ## | For convenience, an alias for the prepared statement is given with row parameter.  
   ## | First block will be executed if query returns a row, otherwise the second block.
-  ## 
-  ## **Example:**
-  ## 
-  ## .. code-block:: Nim
-  ## 
-  ##    let Is_fresh_database = db.prepareSql("SELECT (1) FROM sqlite_master")
-  ##    Is_fresh_database.withRowOr([], rownotused):
-  ##      echo "database has some tables"
-  ##    do:
-  ##      echo "we have a fresh database"
-  ##    discard finalize(Is_fresh_database)
-  ## 
   let s = db.preparedstatements[ord(statement)]
   checkRc(db, bindParams(s, params))
   if(unlikely) db.loggerproc != nil: db.doLog($statement, params)
@@ -471,12 +466,13 @@ template withRowOr*(db: SQLiteral, statement: enum, params: varargs[DbValue, toD
       body1
     else: body2
   finally:
-    discard sqlite3.reset(s)
+    discard reset(s)
 
 
 proc exec*(db: SQLiteral, pstatement: Pstmt, params: varargs[DbValue, toDb]) {.inline.} =
   ## Executes given prepared statement
-  ## Note: doesn't log
+  ## 
+  ## Note: this one doesn't log, because the original sql string is not available
   defer: discard sqlite3.reset(pstatement)  
   checkRc(db, bindParams(pstatement, params))
   checkRc(db, step(pstatement))
@@ -591,7 +587,11 @@ proc createSql(db: var SQLiteral, index: int, sql: cstring) =
 
 
 proc setLogger*(db: var SQLiteral, logger: proc(sqliteral: SQLiteral, statement: string, errorcode: int) {.gcsafe, raises: [].}) =
-  ## doc missing
+  ## Add a callback procedure to gather all executed statements with their parameters.
+  ## 
+  ## If errorcode != 0, statement contains the error message.
+  ## 
+  ## You can use the same logger for multiple sqliterals, the caller is also given as parameter.
   db.loggerproc = logger
 
 
