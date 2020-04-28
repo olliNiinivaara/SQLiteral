@@ -408,7 +408,7 @@ function main() {
 <pre class="listing"><span class="Keyword">var</span> <span class="Identifier">buffer</span> <span class="Operator">=</span> <span class="LongStringLit">&quot;&quot;&quot;{&quot;sentence&quot;: &quot;Call me Ishmael&quot;}&quot;&quot;&quot;</span>
 <span class="Keyword">let</span> <span class="Identifier">value</span> <span class="Operator">=</span> <span class="Identifier">asText</span><span class="Punctuation">(</span><span class="Identifier">buffer</span><span class="Punctuation">,</span> <span class="Identifier">buffer</span><span class="Operator">.</span><span class="Identifier">find</span><span class="Punctuation">(</span><span class="StringLit">&quot; </span><span class="EscapeSequence">\&quot;</span><span class="StringLit">&quot;</span><span class="Punctuation">)</span><span class="Operator">+</span><span class="DecNumber">2</span><span class="Punctuation">,</span> <span class="Identifier">buffer</span><span class="Operator">.</span><span class="Identifier">find</span><span class="Punctuation">(</span><span class="StringLit">&quot;</span><span class="EscapeSequence">\&quot;</span><span class="StringLit">}&quot;</span><span class="Punctuation">)</span><span class="Operator">-</span><span class="DecNumber">1</span><span class="Punctuation">)</span>
 <span class="Identifier">assert</span> <span class="Identifier">value</span><span class="Operator">.</span><span class="Identifier">equals</span><span class="Punctuation">(</span><span class="StringLit">&quot;Call me Ishmael&quot;</span><span class="Punctuation">)</span>
-<span class="Identifier">db</span><span class="Punctuation">[</span><span class="Identifier">Update</span><span class="Punctuation">]</span><span class="Operator">.</span><span class="Identifier">exec</span><span class="Punctuation">(</span><span class="Identifier">rowid</span><span class="Punctuation">,</span> <span class="Identifier">value</span><span class="Punctuation">)</span></pre>
+<span class="Identifier">db</span><span class="Operator">.</span><span class="Identifier">exec</span><span class="Punctuation">(</span><span class="Identifier">Update</span><span class="Punctuation">,</span> <span class="Identifier">value</span><span class="Punctuation">,</span> <span class="Identifier">rowid</span><span class="Punctuation">)</span></pre>
 
 </dd>
 
@@ -810,7 +810,7 @@ Raises SQLError if resultcode notin [SQLITE_OK, SQLITE_ROW, SQLITE_DONE] <a clas
                 <span class="Identifier">row</span><span class="Other">,</span> <span class="Identifier">body</span><span class="Other">:</span> <span class="Identifier">untyped</span><span class="Other">)</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma"><span class="Identifier">dirty</span></span><span class="Other">.}</span></span></pre></dt>
 <dd>
 
-<p>Executes given prepared statement.<br />For convenience, an alias for the prepared statement is given with row parameter.<br />The code block will be executed only if query returns a row.<br /></p>
+<p>Executes given prepared statement.<br />Name for the prepared statement is given with row parameter.<br />The code block will be executed only if query returns a row.<br /></p>
 
 </dd>
 <a id="withRowOr.t,SQLiteral,,varargs[DbValue,toDb],untyped,untyped,untyped"></a>
@@ -818,7 +818,7 @@ Raises SQLError if resultcode notin [SQLITE_OK, SQLITE_ROW, SQLITE_DONE] <a clas
                   <span class="Identifier">row</span><span class="Other">,</span> <span class="Identifier">body1</span><span class="Other">,</span> <span class="Identifier">body2</span><span class="Other">:</span> <span class="Identifier">untyped</span><span class="Other">)</span></pre></dt>
 <dd>
 
-<p>Executes given prepared statement.<br />For convenience, an alias for the prepared statement is given with row parameter.<br />First block will be executed if query returns a row, otherwise the second block.<br /></p>
+<p>Executes given prepared statement.<br />Name for the prepared statement is given with row parameter.<br />First block will be executed if query returns a row, otherwise the second block.<br /></p>
 
 </dd>
 <a id="transaction.t,SQLiteral,uint32,untyped"></a>
@@ -845,7 +845,7 @@ Executes transaction that targets state partition 0
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br/>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2020-04-27 13:39:28 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2020-04-28 08:12:38 UTC</small>
       </div>
     </div>
   </div>

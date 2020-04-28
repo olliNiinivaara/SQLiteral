@@ -149,7 +149,7 @@ type
     ##    var buffer = """{"sentence": "Call me Ishmael"}"""
     ##    let value = asText(buffer, buffer.find(" \"")+2, buffer.find("\"}")-1)
     ##    assert value.equals("Call me Ishmael")
-    ##    db[Update].exec(rowid, value)
+    ##    db.exec(Update, value, rowid)
 
 var emptytext = "X"
 var emptystart = cast[ptr UncheckedArray[char]](addr emptytext[0])
@@ -176,10 +176,6 @@ proc substr*(text: Text, start: int, last: int): string =
 
 # ----------------------------------------------------------
 
-#template checkRc(rc: int) =
-#  # pitäisi voida poistaa
-#  if rc notin [SQLITE_OK, SQLITE_ROW, SQLITE_DONE]:
-#    raise (ref SQLError)(msg: "PStmt error", rescode: rc)
 
 template checkRc*(db: SQLiteral, resultcode: int) =
   ## Raises SQLError if resultcode notin [SQLITE_OK, SQLITE_ROW, SQLITE_DONE]
@@ -442,7 +438,7 @@ template withRowOr*(db: SQLiteral, sql: string, row, body1, body2: untyped) =
 
 template withRow*(db: SQLiteral, statement: enum, params: varargs[DbValue, toDb], row, body: untyped) {.dirty.} =
   ## | Executes given prepared statement.
-  ## | For convenience, an alias for the prepared statement is given with row parameter.
+  ## | Name for the prepared statement is given with row parameter.
   ## | The code block will be executed only if query returns a row.
   let s = db.preparedstatements[ord(statement)]
   defer: discard reset(s)
@@ -455,7 +451,7 @@ template withRow*(db: SQLiteral, statement: enum, params: varargs[DbValue, toDb]
 
 template withRowOr*(db: SQLiteral, statement: enum, params: varargs[DbValue, toDb], row, body1, body2: untyped) =
   ## | Executes given prepared statement.
-  ## | For convenience, an alias for the prepared statement is given with row parameter.  
+  ## | Name for the prepared statement is given with row parameter.  
   ## | First block will be executed if query returns a row, otherwise the second block.
   let s = db.preparedstatements[ord(statement)]
   checkRc(db, bindParams(s, params))
