@@ -102,8 +102,8 @@ type
   SQLiteral* = object
     sqlite*: PSqlite3
     dbname*: string
+    inreadonlymode*: bool
     intransaction: bool
-    inreadonlymode: bool
     walmode: bool 
     maxsize: int    
     partitions: array[100, uint32]
@@ -580,6 +580,17 @@ template transaction*(db: SQLiteral, body: untyped) =
   transaction(db, 0, body)
 
 
+template transactionsDisabled*(db: var SQLiteral, body: untyped) =
+  ## Executes body with all transactions disabled.
+  acquire(db.transactionlock)
+  if(unlikely) db.loggerproc != nil: db.loggerproc(db, "--- TRANSACTIONS DISABLED", 0)
+  try:
+    body
+  finally:
+    if(unlikely) db.loggerproc != nil: db.loggerproc(db, "--- TRANSACTIONS ENABLED", 0)
+    release(db.transactionlock)
+
+
 proc isIntransaction*(db: SQLiteral): bool {.inline.} =
   return db.intransaction
 
@@ -654,20 +665,24 @@ proc setReadonly*(db: var SQLiteral, readonly: bool) =
   ## 2) Journal mode is changed to PERSIST in order to be able to change locking mode
   ## 
   ## 3) Locking mode is changed from EXCLUSIVE to NORMAL, allowing other connections access the database
+  ## 
+  ## Setting readonly fails with exception "cannot change into wal mode from within a transaction"
+  ## when a statement is being executed, for example a result of a select is being iterated.
+  ## 
+  ## ``inreadonlymode`` property tells current mode.
   if readonly == db.inreadonlymode: return
-  acquire(db.transactionlock)
-  if readonly:
-    db.inreadonlymode = readonly
-    db.exes("PRAGMA journal_mode = PERSIST")
-    db.exes("PRAGMA locking_mode = NORMAL")
-    db.exes("SELECT (1) FROM sqlite_master") #  dummy access to release file lock
-  else:
-    if db.walmode: db.exes("PRAGMA journal_mode = WAL")
-    db.exes("PRAGMA locking_mode = EXCLUSIVE") # next write will keep the file lock
-    db.inreadonlymode = readonly
-  if(unlikely) db.loggerproc != nil: db.loggerproc(db, "--- READONLY MODE: " & $readonly , 0)
-  release(db.transactionlock)
-
+  db.transactionsDisabled:
+    if readonly:
+      db.inreadonlymode = readonly
+      db.exes("PRAGMA journal_mode = PERSIST")
+      db.exes("PRAGMA locking_mode = NORMAL")
+      db.exes("SELECT (1) FROM sqlite_master") #  dummy access to release file lock
+    else:
+      if db.walmode: db.exes("PRAGMA journal_mode = WAL")
+      db.exes("PRAGMA locking_mode = EXCLUSIVE") # next write will keep the file lock
+      db.inreadonlymode = readonly
+    if(unlikely) db.loggerproc != nil: db.loggerproc(db, "--- READONLY MODE: " & $readonly , 0)
+    
 
 proc optimize*(db: var SQLiteral, pagesize = -1, walautocheckpoint = -1) =
   ## Vacuums and optimizes the database.
@@ -678,7 +693,7 @@ proc optimize*(db: var SQLiteral, pagesize = -1, walautocheckpoint = -1) =
   ## | https://sqlite.org/pragma.html#pragma_page_size
   ## | https://www.sqlite.org/pragma.html#pragma_wal_checkpoint
   acquire(db.transactionlock)
-  try:    
+  try:   
     db.exes("PRAGMA optimize")
     if walautocheckpoint > -1: db.exes("PRAGMA wal_autocheckpoint = " & $walautocheckpoint)
     if pagesize > -1:
@@ -727,15 +742,17 @@ proc close*(db: var SQLiteral) =
   ## Closes the database
   if db.laststatementindex == -1: return
   var rc = 0
+  acquire(db.transactionlock)
   try:
     finalizeStatements(db)
     rc = close(db.sqlite)
     if rc == SQLITE_OK:
       if db.loggerproc != nil: db.loggerproc(db, "closed", 0)
     else: db.checkRc(rc)
-    deinitLock(db.transactionlock)
   except:
     if db.loggerproc == nil: echo "Could not close ", db.dbname, ": ", getCurrentExceptionMsg()
     elif rc == 0: db.loggerproc(db, getCurrentExceptionMsg(), 1)
   finally:
     db.laststatementindex = -1
+    release(db.transactionlock)
+    deinitLock(db.transactionlock)
