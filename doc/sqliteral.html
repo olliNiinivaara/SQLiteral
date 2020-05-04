@@ -120,6 +120,7 @@ function main() {
   laststatementindex: int
   loggerproc: proc (sqliteral: SQLiteral; statement: string; errorcode: int) {.gcsafe,
       raises: [].}
+  maxparamloggedlen: int
   Transaction: PStmt
   Commit: PStmt
   Rollback: PStmt"><wbr />SQLiteral<span class="attachedType"></span></a></li>
@@ -225,9 +226,10 @@ function main() {
     title="columnExists(db: SQLiteral; table: string; column: string): bool"><wbr />column<wbr />Exists<span class="attachedType">SQLiteral</span></a></li>
   <li><a class="reference" href="#isIntransaction%2CSQLiteral"
     title="isIntransaction(db: SQLiteral): bool"><wbr />is<wbr />Intransaction<span class="attachedType">SQLiteral</span></a></li>
-  <li><a class="reference" href="#setLogger%2CSQLiteral%2Cproc%28SQLiteral%2Cstring%2Cint%29"
+  <li><a class="reference" href="#setLogger%2CSQLiteral%2Cproc%28SQLiteral%2Cstring%2Cint%29%2Cint"
     title="setLogger(db: var SQLiteral; logger: proc (sqliteral: SQLiteral; statement: string;
-                                      errorcode: int) {.gcsafe, raises: [].})"><wbr />set<wbr />Logger<span class="attachedType">SQLiteral</span></a></li>
+                                      code: int) {.gcsafe, raises: [].};
+          paramtruncat = 50)"><wbr />set<wbr />Logger<span class="attachedType">SQLiteral</span></a></li>
   <li><a class="reference" href="#openDatabase%2CSQLiteral%2Cstring%2Cstring%2Ctypedesc%5B%5D%2Cint"
     title="openDatabase(db: var SQLiteral; dbname: string; schema: string;
              Statements: typedesc[enum]; maxKbSize = 0; wal = true)"><wbr />open<wbr />Database<span class="attachedType">SQLiteral</span></a></li>
@@ -326,7 +328,7 @@ function main() {
 
 
 <span class="Keyword">when</span> <span class="Keyword">not</span> <span class="Identifier">defined</span><span class="Punctuation">(</span><span class="Identifier">release</span><span class="Punctuation">)</span><span class="Punctuation">:</span>
-  <span class="Keyword">proc</span> <span class="Identifier">logSql</span><span class="Punctuation">(</span><span class="Identifier">db</span><span class="Punctuation">:</span> <span class="Identifier">SQLiteral</span><span class="Punctuation">,</span> <span class="Identifier">msg</span><span class="Punctuation">:</span> <span class="Identifier">string</span><span class="Punctuation">,</span> <span class="Identifier">error</span><span class="Punctuation">:</span> <span class="Identifier">int</span><span class="Punctuation">)</span> <span class="Operator">=</span> <span class="Identifier">echo</span> <span class="Identifier">msg</span>
+  <span class="Keyword">proc</span> <span class="Identifier">logSql</span><span class="Punctuation">(</span><span class="Identifier">db</span><span class="Punctuation">:</span> <span class="Identifier">SQLiteral</span><span class="Punctuation">,</span> <span class="Identifier">msg</span><span class="Punctuation">:</span> <span class="Identifier">string</span><span class="Punctuation">,</span> <span class="Identifier">code</span><span class="Punctuation">:</span> <span class="Identifier">int</span><span class="Punctuation">)</span> <span class="Operator">=</span> <span class="Identifier">echo</span> <span class="Identifier">code</span><span class="Punctuation">,</span><span class="StringLit">&quot; &quot;</span><span class="Punctuation">,</span><span class="Identifier">msg</span>
   <span class="Identifier">db</span><span class="Operator">.</span><span class="Identifier">setLogger</span><span class="Punctuation">(</span><span class="Identifier">logSql</span><span class="Punctuation">)</span>
 
 <span class="Identifier">db</span><span class="Operator">.</span><span class="Identifier">openDatabase</span><span class="Punctuation">(</span><span class="StringLit">&quot;testdatabase&quot;</span><span class="Punctuation">,</span> <span class="Identifier">Schema</span><span class="Punctuation">,</span> <span class="Identifier">SqlStatements</span><span class="Punctuation">)</span>
@@ -369,6 +371,7 @@ function main() {
   <span class="Identifier">laststatementindex</span><span class="Other">:</span> <span class="Identifier">int</span>
   <span class="Identifier">loggerproc</span><span class="Other">:</span> <span class="Keyword">proc</span> <span class="Other">(</span><span class="Identifier">sqliteral</span><span class="Other">:</span> <a href="sqliteral.html#SQLiteral"><span class="Identifier">SQLiteral</span></a><span class="Other">;</span> <span class="Identifier">statement</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span> <span class="Identifier">errorcode</span><span class="Other">:</span> <span class="Identifier">int</span><span class="Other">)</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma"><span class="Identifier">gcsafe</span><span class="Other">,</span>
       <span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span><span class="Other">.}</span></span>
+  <span class="Identifier">maxparamloggedlen</span><span class="Other">:</span> <span class="Identifier">int</span>
   <span class="Identifier">Transaction</span><span class="Other">:</span> <span class="Identifier">PStmt</span>
   <span class="Identifier">Commit</span><span class="Other">:</span> <span class="Identifier">PStmt</span>
   <span class="Identifier">Rollback</span><span class="Other">:</span> <span class="Identifier">PStmt</span>
@@ -644,9 +647,7 @@ Returns true if query returns any rows
     <span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">SQLError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
 <dd>
 
-<p>Executes given prepared statement</p>
-<p>Note: this one doesn't log, because the original sql string is not available</p>
-
+Executes given prepared statement
 
 </dd>
 <a id="exec,SQLiteral,,varargs[DbValue,toDb]"></a>
@@ -694,13 +695,15 @@ Returns true if given column exists in given table
 
 
 </dd>
-<a id="setLogger,SQLiteral,proc(SQLiteral,string,int)"></a>
-<dt><pre><span class="Keyword">proc</span> <a href="#setLogger%2CSQLiteral%2Cproc%28SQLiteral%2Cstring%2Cint%29"><span class="Identifier">setLogger</span></a><span class="Other">(</span><span class="Identifier">db</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="sqliteral.html#SQLiteral"><span class="Identifier">SQLiteral</span></a><span class="Other">;</span> <span class="Identifier">logger</span><span class="Other">:</span> <span class="Keyword">proc</span> <span class="Other">(</span><span class="Identifier">sqliteral</span><span class="Other">:</span> <a href="sqliteral.html#SQLiteral"><span class="Identifier">SQLiteral</span></a><span class="Other">;</span> <span class="Identifier">statement</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span>
-    <span class="Identifier">errorcode</span><span class="Other">:</span> <span class="Identifier">int</span><span class="Other">)</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma"><span class="Identifier">gcsafe</span><span class="Other">,</span> <span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span><span class="Other">.}</span></span><span class="Other">)</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
+<a id="setLogger,SQLiteral,proc(SQLiteral,string,int),int"></a>
+<dt><pre><span class="Keyword">proc</span> <a href="#setLogger%2CSQLiteral%2Cproc%28SQLiteral%2Cstring%2Cint%29%2Cint"><span class="Identifier">setLogger</span></a><span class="Other">(</span><span class="Identifier">db</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="sqliteral.html#SQLiteral"><span class="Identifier">SQLiteral</span></a><span class="Other">;</span> <span class="Identifier">logger</span><span class="Other">:</span> <span class="Keyword">proc</span> <span class="Other">(</span><span class="Identifier">sqliteral</span><span class="Other">:</span> <a href="sqliteral.html#SQLiteral"><span class="Identifier">SQLiteral</span></a><span class="Other">;</span> <span class="Identifier">statement</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span>
+    <span class="Identifier">code</span><span class="Other">:</span> <span class="Identifier">int</span><span class="Other">)</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma"><span class="Identifier">gcsafe</span><span class="Other">,</span> <span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span><span class="Other">.}</span></span><span class="Other">;</span> <span class="Identifier">paramtruncat</span> <span class="Other">=</span> <span class="DecNumber">50</span><span class="Other">)</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
 <dd>
 
 <p>Add a callback procedure to gather all executed statements with their parameters.</p>
-<p>If errorcode != 0, statement contains the error message.</p>
+<p>If code &gt; 0, log concerns sqlite error with error code in question.</p>
+<p>If code == -1, log may be of minor interest (originating from exes or statement preparation).</p>
+<p>Paramtruncat parameter limits the maximum log length of parameters so that long inputs won't clutter logs. Value &lt; 1 disables truncation.</p>
 <p>You can use the same logger for multiple sqliterals, the caller is also given as parameter.</p>
 
 
@@ -770,9 +773,7 @@ Iterates over the query results
     <span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">SQLError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
 <dd>
 
-<p>Iterates over the query results</p>
-<p>Note: this one doesn't log, because the original sql string is not available</p>
-
+Iterates over the query results
 
 </dd>
 
@@ -845,7 +846,7 @@ Executes transaction that targets state partition 0
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br/>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2020-04-28 08:12:38 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2020-05-04 10:23:19 UTC</small>
       </div>
     </div>
   </div>
