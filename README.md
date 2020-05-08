@@ -8,4 +8,4 @@ state syncing, debugging executed statements, static binding to sqlite3.c of you
 http://htmlpreview.github.io/?https://github.com/olliNiinivaara/SQLiteral/blob/master/doc/sqliteral.html
 
 ## Installation
-latest stable release (1.1.0): `nimble install https://github.com/olliNiinivaara/SQLiteral`
+latest stable release (1.1.0): `nimble install sqliteral`
