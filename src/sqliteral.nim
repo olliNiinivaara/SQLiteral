@@ -1,4 +1,4 @@
-const SQLiteralVersion = "1.1.0"
+const SQLiteralVersion = "1.2.0"
 
 # (C) Olli Niinivaara, 2020
 # MIT Licensed
@@ -74,16 +74,18 @@ const SQLiteralVersion = "1.1.0"
 ## sqlite3.c must be on compiler search path.
 ## You can extract it from an amalgamation available at https://www.sqlite.org/download.html.
 ## 
-## Compile command must contain these arguments:
-## -d:staticSqlite --passL:-lpthread
-## An example: `nim c -r --threads:on -d:staticSqlite --passL:-lpthread myprogram`
+## Compile command must define:
+## -d:staticSqlite
+## An example: `nim c -r --experimental:views --threads:on -d:staticSqlite myprogram`
 ## 
 ## See also
 ## ========
 ## 
 ## | `sqlite <https://nim-lang.org/docs/db_sqlite.html>`_
 ## | `tiny_sqlite <https://gulpf.github.io/tiny_sqlite/tiny_sqlite.html>`_
-## 
+##
+
+{.passL: "-lpthread".}
 
 import sqlite3
 export PStmt, errmsg, reset, step, finalize, SQLITE_ROW
@@ -119,66 +121,85 @@ type
     Commit: PStmt
     Rollback: PStmt
 
-  DbValueKind = enum
-    sqliteInteger,
-    sqliteReal,
-    sqliteText,
-    sqliteBlob
+when compiles(var x = toOpenArray("x", 0, 0)):
+  type
+    DbValueKind = enum
+      sqliteInteger,
+      sqliteReal,
+      sqliteText,
+      sqliteBlob
+    DbValue* = object
+      ## | Represents a value in a SQLite database.
+      ## | https://www.sqlite.org/datatype3.html
+      ## | NULL values are not possible to avoid the billion-dollar mistake.
+      case kind*: DbValueKind
+      of sqliteInteger:
+        intVal*: int64
+      of sqliteReal:
+        floatVal*: float64
+      of sqliteText:
+        textVal*: openArray[char]
+      of sqliteBlob:
+        blobVal*: seq[byte]
+else:
+  type
+    DbValueKind = enum
+      sqliteInteger,
+      sqliteReal,
+      sqliteDeprecatedText,
+      sqliteBlob
+    DbValue* = object
+      ## | Represents a value in a SQLite database.
+      ## | https://www.sqlite.org/datatype3.html
+      ## | NULL values are not possible to avoid the billion-dollar mistake.
+      case kind*: DbValueKind
+      of sqliteInteger:
+        intVal*: int64
+      of sqliteReal:
+        floatVal*: float64
+      of sqliteDeprecatedText:
+        deprecatedtextVal*: Text
+      of sqliteBlob:
+        blobVal*: seq[byte]
 
-  DbValue* = object
-    ## | Represents a value in a SQLite database.
-    ## | https://www.sqlite.org/datatype3.html
-    ## | NULL values are not possible to avoid the billion-dollar mistake.
-    case kind*: DbValueKind
+    # Text ----------------------------------------------------
 
-    of sqliteInteger:
-      intVal*: int64
-    of sqliteReal:
-      floatVal*: float64
-    of sqliteText:
-      textVal*: Text
-    of sqliteBlob:
-      blobVal*: seq[byte]
+    Text* {.deprecated: "use openArray[string] with {.experimental: views.}".} = tuple[data: ptr UncheckedArray[char], len: int32]
+        ## To avoid copying strings, SQLiteral offers Text as a zero-copy view to a slice of existing string
+        ## 
+        ## **Example:**
+        ##
+        ## .. code-block:: Nim
+        ##
+        ##    var buffer = """{"sentence": "Call me Ishmael"}"""
+        ##    let value = asText(buffer, buffer.find(" \"")+2, buffer.find("\"}")-1)
+        ##    assert value.equals("Call me Ishmael")
+        ##    db.exec(Update, value, rowid)
 
+  var emptytext = "X"
+  var emptystart = cast[ptr UncheckedArray[char]](addr emptytext[0])
 
-# Text ----------------------------------------------------
+  proc asText*(fromstring: string, start: int, last: int): Text =
+    ## Creates a zero-copy view to a substring of existing string
+    doAssert(last < fromstring.len)
+    doAssert(last < int32.high)
+    (cast[ptr UncheckedArray[char]](fromstring[start].unsafeAddr), (last - start + 1).int32)
 
-  Text* = tuple[data: ptr UncheckedArray[char], len: int32]
-    ## To avoid copying strings, SQLiteral offers Text as a zero-copy view to a slice of existing string
-    ## 
-    ## **Example:**
-    ##
-    ## .. code-block:: Nim
-    ##
-    ##    var buffer = """{"sentence": "Call me Ishmael"}"""
-    ##    let value = asText(buffer, buffer.find(" \"")+2, buffer.find("\"}")-1)
-    ##    assert value.equals("Call me Ishmael")
-    ##    db.exec(Update, value, rowid)
+  proc equals*(text: Text, str: string): bool {.inline.} =
+    if text.len != str.len: return false
+    for i in 0 ..< text.len:
+      if text.data[i] != str[i]: return false
+    return true
 
-var emptytext = "X"
-var emptystart = cast[ptr UncheckedArray[char]](addr emptytext[0])
+  proc `$`*(text: Text): string =
+    for i in 0 ..< text.len: result.add(text.data[i])
 
-proc asText*(fromstring: string, start: int, last: int): Text =
-  ## Creates a zero-copy view to a substring of existing string
-  doAssert(last < fromstring.len)
-  doAssert(last < int32.high)
-  (cast[ptr UncheckedArray[char]](fromstring[start].unsafeAddr), (last - start + 1).int32)
+  proc len*(text: Text): int {.inline.} = text.len
 
-proc equals*(text: Text, str: string): bool {.inline.} =
-  if text.len != str.len: return false
-  for i in 0 ..< text.len:
-    if text.data[i] != str[i]: return false
-  return true
+  proc substr*(text: Text, start: int, last: int): string =
+    for i in start ..< last: result.add(text.data[i])
 
-proc `$`*(text: Text): string =
-  for i in 0 ..< text.len: result.add(text.data[i])
-
-proc len*(text: Text): int {.inline.} = text.len
-
-proc substr*(text: Text, start: int, last: int): string =
-  for i in start ..< last: result.add(text.data[i])
-
-# ----------------------------------------------------------
+  # ----------------------------------------------------------
 
 
 template checkRc*(db: SQLiteral, resultcode: int) =
@@ -194,41 +215,64 @@ proc toDb*[T: Ordinal](val: T): DbValue {.inline.} = DbValue(kind: sqliteInteger
 
 proc toDb*[T: SomeFloat](val: T): DbValue {.inline.} = DbValue(kind: sqliteReal, floatVal: val.float64)
 
-proc toDb*[T: string](val: T): DbValue {.inline.} =
-  if val.len == 0:
-    DbValue(kind: sqliteText, textVal: (emptystart , 0.int32))
-  else:
-    DbValue(kind: sqliteText, textVal: (cast[ptr UncheckedArray[char]](val[0].unsafeAddr) , val.len.int32))
+when compiles(var x = toOpenArray("x", 0, 0)):
+  proc toDb*[T: string](val: T): DbValue {.inline.} =
+    DbValue(kind: sqliteText, textVal: toOpenArray(val, 0, val.high))
+else:
+  proc toDb*[T: string](val: T): DbValue {.inline.} =
+    if val.len == 0:
+      DbValue(kind: sqliteDeprecatedText, deprecatedtextVal: (emptystart , 0.int32))
+    else:
+      DbValue(kind: sqliteDeprecatedText, deprecatedtextVal: (cast[ptr UncheckedArray[char]](val[0].unsafeAddr) , val.len.int32))
 
-proc toDb*[T: Text](val: T): DbValue {.inline.} =
-  if val[1] < 0 or val[1] > high(int32):  raise (ref SQLError)(msg: "Text weird len: " & $val[1])
-  DbValue(kind: sqliteText, textVal: val)
+  proc toDb*[T: Text](val: T): DbValue {.inline.} =
+    if val[1] < 0 or val[1] > high(int32):  raise (ref SQLError)(msg: "Text weird len: " & $val[1])
+    DbValue(kind: sqliteDeprecatedText, textVal: val)
 
 proc toDb*[T: seq[byte]](val: T): DbValue {.inline.} = DbValue(kind: sqliteBlob, blobVal: val) # TODO: test
-
+  
 proc toDb*[T: DbValue](val: T): DbValue {.inline.} = val
 
+when compiles(var x = toOpenArray("x", "0", 0)):
+  proc `$`*[T: DbValue](val: T): string {.inline.} = 
+    case val.kind
+    of sqliteInteger: $val.intval
+    of sqliteReal: $val.floatVal
+    of sqliteText: $val.textVal
+    of sqliteBlob: cast[string](val.blobVal)
+else:
+  proc `$`*[T: DbValue](val: T): string {.inline.} = 
+    case val.kind
+    of sqliteInteger: $val.intval
+    of sqliteReal: $val.floatVal
+    of sqliteDeprecatedText: $val.deprecatedtextVal
+    of sqliteBlob: cast[string](val.blobVal)
 
-proc `$`*[T: DbValue](val: T): string {.inline.} = 
-  case val.kind
-  of sqliteInteger: $val.intval
-  of sqliteReal: $val.floatVal
-  of sqliteText: $val.textVal
-  of sqliteBlob: cast[string](val.blobVal)
 
-
-proc bindParams*(sql: PStmt, params: varargs[DbValue]): int {.inline.} =
-  # public only becuse of Nim compiler...
-  var idx = 1.int32
-  for value in params:
-    result =
-      case value.kind
-      of sqliteInteger: bind_int64(sql, idx, value.intval)
-      of sqliteReal: bind_double(sql, idx, value.floatVal)
-      of sqliteText: bind_text(sql, idx, value.textVal[0], value.textVal[1].int32, SQLITE_STATIC)
-      of sqliteBlob: bind_blob(sql, idx.int32, cast[string](value.blobVal).cstring, value.blobVal.len.int32 , SQLITE_STATIC) # TODO: test
-    if result != SQLITE_OK: return
-    idx.inc
+when compiles(var x = toOpenArray("x", "0", 0)):
+  proc bindParams(sql: PStmt, params: varargs[DbValue]): int {.inline.} =
+    var idx = 1.int32
+    for value in params:
+      result =
+        case value.kind
+        of sqliteInteger: bind_int64(sql, idx, value.intval)
+        of sqliteReal: bind_double(sql, idx, value.floatVal)
+        of sqliteText: bind_text(sql, idx, cstring(unsafeAddr value.textVal[0]), value.textVal.len().int32, SQLITE_STATIC)
+        of sqliteBlob: bind_blob(sql, idx.int32, cast[string](value.blobVal).cstring, value.blobVal.len.int32 , SQLITE_STATIC) # TODO: test
+      if result != SQLITE_OK: return
+      idx.inc
+else:
+  proc bindParams(sql: PStmt, params: varargs[DbValue]): int {.inline.} =
+    var idx = 1.int32
+    for value in params:
+      result =
+        case value.kind
+        of sqliteInteger: bind_int64(sql, idx, value.intval)
+        of sqliteReal: bind_double(sql, idx, value.floatVal)
+        of sqliteDeprecatedText: bind_text(sql, idx, value.deprecatedtextVal[0], value.deprecatedtextVal[1].int32, SQLITE_STATIC)
+        of sqliteBlob: bind_blob(sql, idx.int32, cast[string](value.blobVal).cstring, value.blobVal.len.int32 , SQLITE_STATIC) # TODO: test
+      if result != SQLITE_OK: return
+      idx.inc
 
 
 template log() =
@@ -245,22 +289,9 @@ template log() =
   db.loggerproc(db, logstring, 0)
 
 
-# TODO: get rid of this (and use above template)
 proc doLog*(db: SQLiteral, statement: string, params: varargs[DbValue, toDb]) {.inline.} =
-  if statement == "Pstmt rows" or statement == "exec Pstmt":
-    db.loggerproc(db, statement & " " & $params, 0)
-    return
-  var logstring = statement
-  var replacement = 0
-  while replacement < params.len:
-    let position = logstring.find('?')
-    assert(position != -1, "too many params (" & $params.len & ") for: " & statement)
-    let param =
-      if db.maxparamloggedlen < 1: $params[replacement]
-      else: ($params[replacement]).substr(0, db.maxparamloggedlen - 1)
-    logstring = logstring[0 .. position-1] & param & logstring.substr(position+1)
-    replacement += 1
-  db.loggerproc(db, logstring, 0)
+  if statement == "Pstmt rows" or statement == "exec Pstmt": db.loggerproc(db, statement & " " & $params, 0)
+  else: log()
 
 
 proc getState*(db: var SQLiteral, partition: uint32 = 0): uint32
@@ -554,11 +585,8 @@ proc columnExists*(db: SQLiteral, table: string, column: string): bool =
     discard pstmt.finalize()
   
 
-template transaction*(db: var SQLiteral, statepartition: uint32, body: untyped)
-  {.deprecated: "create your own state handler with setOnCommitCallback instead".} = 
-  ## | Every write to database must happen inside some transaction.
-  ## | Groups of reads must be wrapped in same transaction if mutual consistency required.
-  ## | In WAL mode (the default), independent reads must NOT be wrapped in transaction to allow parallel processing.
+template transaction*(db: var SQLiteral, statepartition: uint32, body: untyped) =
+  ## statepartition handling is being deprecated; create your own state handler with setOnCommitCallback instead 
   if not db.inreadonlymode:
     assert(statepartition < 100, "statepartition out of bounds")
     acquire(db.transactionlock)
@@ -583,7 +611,9 @@ template transaction*(db: var SQLiteral, statepartition: uint32, body: untyped)
 
 
 template transaction*(db: SQLiteral, body: untyped) =
-  ## Executes transaction
+  ## | Every write to database must happen inside some transaction.
+  ## | Groups of reads must be wrapped in same transaction if mutual consistency required.
+  ## | In WAL mode (the default), independent reads must NOT be wrapped in transaction to allow parallel processing.
   transaction(db, 0, body)
 
 
