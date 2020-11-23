@@ -28,11 +28,12 @@ const SQLiteralVersion = "1.1.0"
 ##    Data = 1
 ##  
 ##  var db: SQLiteral
+##  var state: int
 ##  
 ##  
 ##  proc operate() =
 ##    {.gcsafe.}:
-##      echo "startstate: ", db.getState()
+##      echo "startstate: ", state
 ##      
 ##      for i in 0 .. 9:
 ##        db.transaction:
@@ -51,7 +52,7 @@ const SQLiteralVersion = "1.1.0"
 ##            db.exec(Delete, rowid)
 ##            echo "- ", row.getString(Data)
 ##      
-##      echo "endstate: ", db.getState()
+##      echo "endstate: ", state
 ##  
 ##  
 ##  when not defined(release):
@@ -60,6 +61,7 @@ const SQLiteralVersion = "1.1.0"
 ##  
 ##  db.openDatabase("testdatabase", Schema, SqlStatements)
 ##  db.about()
+##  db.setOnCommitCallback(proc (db: SQLiteral) = state.atomicInc)
 ##  var threads: array[5, Thread[void]]
 ##  for i in 0 .. threads.high: createThread(threads[i], operate)
 ##  joinThreads(threads)
@@ -74,7 +76,7 @@ const SQLiteralVersion = "1.1.0"
 ## 
 ## Compile command must contain these arguments:
 ## -d:staticSqlite --passL:-lpthread
-## An example: `nim c -r --threads:on -d:staticSqlite --passL:-lpthread myprogram.nim`
+## An example: `nim c -r --threads:on -d:staticSqlite --passL:-lpthread myprogram`
 ## 
 ## See also
 ## ========
@@ -111,6 +113,7 @@ type
     preparedstatements: array[MaxStatements, PStmt]
     laststatementindex: int
     loggerproc: proc(sqliteral: SQLiteral, statement: string, errorcode: int) {.gcsafe, raises: [].}
+    oncommitproc: proc(sqliteral: SQLiteral) {.gcsafe, raises: [].}
     maxparamloggedlen: int
     Transaction: PStmt
     Commit: PStmt
@@ -260,7 +263,8 @@ proc doLog*(db: SQLiteral, statement: string, params: varargs[DbValue, toDb]) {.
   db.loggerproc(db, logstring, 0)
 
 
-proc getState*(db: var SQLiteral, partition: uint32 = 0): uint32 =
+proc getState*(db: var SQLiteral, partition: uint32 = 0): uint32
+  {.deprecated: "create your own state handler with setOnCommitCallback instead".} = 
   ## Returns a number that atomically changes on every transaction targeting the given partition.
   ## Clients can use this number to check if their local data is up-to-date or a resync is needed.
   ## Partitions use zero based-indexing, so first partition is partition 0.
@@ -269,7 +273,8 @@ proc getState*(db: var SQLiteral, partition: uint32 = 0): uint32 =
   return db.partitions[partition]
 
 
-proc changeState*(db: var SQLiteral, partition: uint32 = 0): uint32 =
+proc changeState*(db: var SQLiteral, partition: uint32 = 0): uint32
+  {.deprecated: "create your own state handler with setOnCommitCallback instead".} =
   if db.inreadonlymode: return  
   assert(partition < 100, "partition out of bounds")
   var transaction = false
@@ -549,7 +554,8 @@ proc columnExists*(db: SQLiteral, table: string, column: string): bool =
     discard pstmt.finalize()
   
 
-template transaction*(db: var SQLiteral, statepartition: uint32, body: untyped) =
+template transaction*(db: var SQLiteral, statepartition: uint32, body: untyped)
+  {.deprecated: "create your own state handler with setOnCommitCallback instead".} = 
   ## | Every write to database must happen inside some transaction.
   ## | Groups of reads must be wrapped in same transaction if mutual consistency required.
   ## | In WAL mode (the default), independent reads must NOT be wrapped in transaction to allow parallel processing.
@@ -570,13 +576,14 @@ template transaction*(db: var SQLiteral, statepartition: uint32, body: untyped) 
       if(unlikely) db.partitions[statepartition] > 2000000000: db.partitions[statepartition].dec(2000000000)
       if db.intransaction:
         db.exec(db.Commit)
+        if db.oncommitproc != nil: db.oncommitproc(db)
         db.intransaction = false
         if(unlikely) db.loggerproc != nil: db.loggerproc(db, "--- COMMIT", 0)
       release(db.transactionlock)
 
 
 template transaction*(db: SQLiteral, body: untyped) =
-  ## Executes transaction that targets state partition 0
+  ## Executes transaction
   transaction(db, 0, body)
 
 
@@ -605,7 +612,7 @@ proc createStatement(db: var SQLiteral, statement: enum) =
 
 
 proc setLogger*(db: var SQLiteral, logger: proc(sqliteral: SQLiteral, statement: string, code: int) {.gcsafe, raises: [].}, paramtruncat = 50) =
-  ## Add a callback procedure to gather all executed statements with their parameters.
+  ## Set callback procedure to gather all executed statements with their parameters.
   ## 
   ## If code > 0, log concerns sqlite error with error code in question.
   ## 
@@ -617,6 +624,11 @@ proc setLogger*(db: var SQLiteral, logger: proc(sqliteral: SQLiteral, statement:
   db.maxparamloggedlen = paramtruncat
   db.loggerproc = logger
 
+
+proc setOnCommitCallback*(db: var SQLiteral, oncommit: proc(sqliteral: SQLiteral) {.gcsafe, raises: [].}) =
+  ## Set callback procedure that is triggered inside transaction proc, when commit to database has been executed.
+  db.oncommitproc = oncommit
+  
 
 proc openDatabase*(db: var SQLiteral, dbname: string, schema: string, Statements: typedesc[enum], maxKbSize = 0, wal = true) =
   ## Opens an exclusive connection, boots up the database, executes given schema and prepares given statements.
