@@ -71,11 +71,10 @@ const SQLiteralVersion = "1.2.0"
 ## Compiling
 ## =========
 ## 
-## sqlite3.c must be on compiler search path.
-## You can extract it from an amalgamation available at https://www.sqlite.org/download.html.
+## sqlite3.c amalgamation must be on compiler search path, get yours from https://www.sqlite.org/download.html.
 ## 
-## Compile command must define:
-## -d:staticSqlite
+## Compile command must define: `-d:staticSqlite`
+## 
 ## An example: `nim c -r --experimental:views --threads:on -d:staticSqlite myprogram`
 ## 
 ## See also
@@ -121,13 +120,15 @@ type
     Commit: PStmt
     Rollback: PStmt
 
+type
+  DbValueKind = enum
+    sqliteInteger,
+    sqliteReal,
+    sqliteText,
+    sqliteBlob
+
 when compiles(var x = toOpenArray("x", 0, 0)):
   type
-    DbValueKind = enum
-      sqliteInteger,
-      sqliteReal,
-      sqliteText,
-      sqliteBlob
     DbValue* = object
       ## | Represents a value in a SQLite database.
       ## | https://www.sqlite.org/datatype3.html
@@ -143,11 +144,6 @@ when compiles(var x = toOpenArray("x", 0, 0)):
         blobVal*: seq[byte]
 else:
   type
-    DbValueKind = enum
-      sqliteInteger,
-      sqliteReal,
-      sqliteDeprecatedText,
-      sqliteBlob
     DbValue* = object
       ## | Represents a value in a SQLite database.
       ## | https://www.sqlite.org/datatype3.html
@@ -157,35 +153,40 @@ else:
         intVal*: int64
       of sqliteReal:
         floatVal*: float64
-      of sqliteDeprecatedText:
+      of sqliteText:
         deprecatedtextVal*: Text
+          ## use --experimental:views compile flag to use openArray[char] instead.
+          ## (unfortunately nimdoc does not support the feature.)
       of sqliteBlob:
         blobVal*: seq[byte]
 
     # Text ----------------------------------------------------
 
-    Text* {.deprecated: "use openArray[string] with {.experimental: views.}".} = tuple[data: ptr UncheckedArray[char], len: int32]
-        ## To avoid copying strings, SQLiteral offers Text as a zero-copy view to a slice of existing string
-        ## 
-        ## **Example:**
-        ##
-        ## .. code-block:: Nim
-        ##
-        ##    var buffer = """{"sentence": "Call me Ishmael"}"""
-        ##    let value = asText(buffer, buffer.find(" \"")+2, buffer.find("\"}")-1)
-        ##    assert value.equals("Call me Ishmael")
-        ##    db.exec(Update, value, rowid)
+    Text* = tuple[data: ptr UncheckedArray[char], len: int32]
+      ## Compile with --experimental:views to get proper language-supported zero-copy views to slices of existing strings.
+      ## This hack is deprecated and will be removed when views become official!
+      ## 
+      ## To avoid copying strings, SQLiteral offers Text as a zero-copy view to a slice of existing string
+      ## 
+      ## **Example:**
+      ##
+      ## .. code-block:: Nim
+      ##
+      ##    var buffer = """{"sentence": "Call me Ishmael"}"""
+      ##    let value = asText(buffer, buffer.find(" \"")+2, buffer.find("\"}")-1)
+      ##    assert value.equals("Call me Ishmael")
+      ##    db.exec(Update, value, rowid)
 
   var emptytext = "X"
   var emptystart = cast[ptr UncheckedArray[char]](addr emptytext[0])
 
-  proc asText*(fromstring: string, start: int, last: int): Text =
+  proc asText*(fromstring: string, start: int, last: int): Text {.deprecated.} =
     ## Creates a zero-copy view to a substring of existing string
     doAssert(last < fromstring.len)
     doAssert(last < int32.high)
     (cast[ptr UncheckedArray[char]](fromstring[start].unsafeAddr), (last - start + 1).int32)
 
-  proc equals*(text: Text, str: string): bool {.inline.} =
+  proc equals*(text: Text, str: string): bool {.inline, deprecated.} =
     if text.len != str.len: return false
     for i in 0 ..< text.len:
       if text.data[i] != str[i]: return false
@@ -194,9 +195,9 @@ else:
   proc `$`*(text: Text): string =
     for i in 0 ..< text.len: result.add(text.data[i])
 
-  proc len*(text: Text): int {.inline.} = text.len
+  proc len*(text: Text): int {.inline, deprecated.} = text.len
 
-  proc substr*(text: Text, start: int, last: int): string =
+  proc substr*(text: Text, start: int, last: int): string {.deprecated.} =
     for i in start ..< last: result.add(text.data[i])
 
   # ----------------------------------------------------------
@@ -221,13 +222,13 @@ when compiles(var x = toOpenArray("x", 0, 0)):
 else:
   proc toDb*[T: string](val: T): DbValue {.inline.} =
     if val.len == 0:
-      DbValue(kind: sqliteDeprecatedText, deprecatedtextVal: (emptystart , 0.int32))
+      DbValue(kind: sqliteText, deprecatedtextVal: (emptystart , 0.int32))
     else:
-      DbValue(kind: sqliteDeprecatedText, deprecatedtextVal: (cast[ptr UncheckedArray[char]](val[0].unsafeAddr) , val.len.int32))
+      DbValue(kind: sqliteText, deprecatedtextVal: (cast[ptr UncheckedArray[char]](val[0].unsafeAddr) , val.len.int32))
 
   proc toDb*[T: Text](val: T): DbValue {.inline.} =
     if val[1] < 0 or val[1] > high(int32):  raise (ref SQLError)(msg: "Text weird len: " & $val[1])
-    DbValue(kind: sqliteDeprecatedText, textVal: val)
+    DbValue(kind: sqliteText, textVal: val)
 
 proc toDb*[T: seq[byte]](val: T): DbValue {.inline.} = DbValue(kind: sqliteBlob, blobVal: val) # TODO: test
   
@@ -245,12 +246,12 @@ else:
     case val.kind
     of sqliteInteger: $val.intval
     of sqliteReal: $val.floatVal
-    of sqliteDeprecatedText: $val.deprecatedtextVal
+    of sqliteText: $val.deprecatedtextVal
     of sqliteBlob: cast[string](val.blobVal)
 
 
 when compiles(var x = toOpenArray("x", "0", 0)):
-  proc bindParams(sql: PStmt, params: varargs[DbValue]): int {.inline.} =
+  proc bindParams*(sql: PStmt, params: varargs[DbValue]): int {.inline.} =
     var idx = 1.int32
     for value in params:
       result =
@@ -262,14 +263,14 @@ when compiles(var x = toOpenArray("x", "0", 0)):
       if result != SQLITE_OK: return
       idx.inc
 else:
-  proc bindParams(sql: PStmt, params: varargs[DbValue]): int {.inline.} =
+  proc bindParams*(sql: PStmt, params: varargs[DbValue]): int {.inline.} =
     var idx = 1.int32
     for value in params:
       result =
         case value.kind
         of sqliteInteger: bind_int64(sql, idx, value.intval)
         of sqliteReal: bind_double(sql, idx, value.floatVal)
-        of sqliteDeprecatedText: bind_text(sql, idx, value.deprecatedtextVal[0], value.deprecatedtextVal[1].int32, SQLITE_STATIC)
+        of sqliteText: bind_text(sql, idx, value.deprecatedtextVal[0], value.deprecatedtextVal[1].int32, SQLITE_STATIC)
         of sqliteBlob: bind_blob(sql, idx.int32, cast[string](value.blobVal).cstring, value.blobVal.len.int32 , SQLITE_STATIC) # TODO: test
       if result != SQLITE_OK: return
       idx.inc
