@@ -1,10 +1,11 @@
-const SQLiteralVersion = "1.2.0"
+const SQLiteralVersion* = "1.3.0"
 
 # (C) Olli Niinivaara, 2020
 # MIT Licensed
 
-## A high level SQLite API with support for multi-threading, prepared statements, proper typing, zero-copy string views,
-## state syncing, debugging executed statements, static binding to sqlite3.c of your choice, optimizing, and more.
+## A high level SQLite API with support for multi-threading, prepared statements,
+## proper typing, zero-copy string views, debugging executed statements,
+## static binding to sqlite3.c of your choice, optimizing, backups, and more.
 ## 
 ## A Complete Example
 ## ==================
@@ -71,7 +72,8 @@ const SQLiteralVersion = "1.2.0"
 ## Compiling
 ## =========
 ## 
-## sqlite3.c amalgamation must be on compiler search path, get yours from https://www.sqlite.org/download.html.
+## sqlite3.c amalgamation must be on compiler search path, get yours from
+## https://www.sqlite.org/download.html.
 ## 
 ## Compile command must define: `-d:staticSqlite`
 ## 
@@ -109,7 +111,6 @@ type
     intransaction: bool
     walmode: bool 
     maxsize: int    
-    partitions: array[100, uint32]
     transactionlock: Lock
     preparedstatements: array[MaxStatements, PStmt]
     laststatementindex: int
@@ -163,8 +164,9 @@ else:
     # Text ----------------------------------------------------
 
     Text* = tuple[data: ptr UncheckedArray[char], len: int32]
-      ## Compile with --experimental:views to get proper language-supported zero-copy views to slices of existing strings.
-      ## This hack is deprecated and will be removed when views become official!
+      ## Compile with --experimental:views to get proper language-supported zero-copy
+      ## views to slices of existing strings.
+      ## Current hack is deprecated and will be removed when views become official...
       ## 
       ## To avoid copying strings, SQLiteral offers Text as a zero-copy view to a slice of existing string
       ## 
@@ -259,7 +261,8 @@ when compiles(var x = toOpenArray("x", "0", 0)):
         of sqliteInteger: bind_int64(sql, idx, value.intval)
         of sqliteReal: bind_double(sql, idx, value.floatVal)
         of sqliteText: bind_text(sql, idx, cstring(unsafeAddr value.textVal[0]), value.textVal.len().int32, SQLITE_STATIC)
-        of sqliteBlob: bind_blob(sql, idx.int32, cast[string](value.blobVal).cstring, value.blobVal.len.int32 , SQLITE_STATIC) # TODO: test
+        of sqliteBlob: bind_blob(sql, idx.int32, cast[string](value.blobVal).cstring,
+         value.blobVal.len.int32 , SQLITE_STATIC) # TODO: test
       if result != SQLITE_OK: return
       idx.inc
 else:
@@ -271,7 +274,8 @@ else:
         of sqliteInteger: bind_int64(sql, idx, value.intval)
         of sqliteReal: bind_double(sql, idx, value.floatVal)
         of sqliteText: bind_text(sql, idx, value.deprecatedtextVal[0], value.deprecatedtextVal[1].int32, SQLITE_STATIC)
-        of sqliteBlob: bind_blob(sql, idx.int32, cast[string](value.blobVal).cstring, value.blobVal.len.int32 , SQLITE_STATIC) # TODO: test
+        of sqliteBlob: bind_blob(sql, idx.int32, cast[string](value.blobVal).cstring,
+         value.blobVal.len.int32 , SQLITE_STATIC) # TODO: test
       if result != SQLITE_OK: return
       idx.inc
 
@@ -293,34 +297,7 @@ template log() =
 proc doLog*(db: SQLiteral, statement: string, params: varargs[DbValue, toDb]) {.inline.} =
   if statement == "Pstmt rows" or statement == "exec Pstmt": db.loggerproc(db, statement & " " & $params, 0)
   else: log()
-
-
-proc getState*(db: var SQLiteral, partition: uint32 = 0): uint32
-  {.deprecated: "create your own state handler with setOnCommitCallback instead".} = 
-  ## Returns a number that atomically changes on every transaction targeting the given partition.
-  ## Clients can use this number to check if their local data is up-to-date or a resync is needed.
-  ## Partitions use zero based-indexing, so first partition is partition 0.
-  ## Maximum number of partitions is hard-coded to 100.
-  assert(partition < 100, "partition out of bounds")
-  return db.partitions[partition]
-
-
-proc changeState*(db: var SQLiteral, partition: uint32 = 0): uint32
-  {.deprecated: "create your own state handler with setOnCommitCallback instead".} =
-  if db.inreadonlymode: return  
-  assert(partition < 100, "partition out of bounds")
-  var transaction = false
-  if not db.intransaction:
-    acquire(db.transactionlock)
-    db.intransaction = true
-    transaction = true
-  db.partitions[partition].inc 
-  if db.partitions[partition] > 2000000000: db.partitions[partition].dec(2000000000)
-  result = db.partitions[partition]
-  if transaction:
-    release(db.transactionlock)
-    db.intransaction = false
-  
+ 
 
 proc getInt*(prepared: PStmt, col: int32 = 0): int64 {.inline.} =
   ## Returns value of INTEGER -type column at given column index
@@ -388,7 +365,8 @@ proc getTheInt*(db: SQLiteral, statement: enum, params: varargs[DbValue, toDb]):
 
 
 proc getTheInt*(db: SQLiteral, s: string): int64 {.inline.} =
-  ## | Dynamically prepares, executes and finalizes given query and returns value of INTEGER -type column at column index 0 of first result row.
+  ## | Dynamically prepares, executes and finalizes given query and returns value of INTEGER -type
+  ## column at column index 0 of first result row.
   ## | If query does not return any rows, returns -2147483647 (low(int32) + 1).
   if(unlikely) db.loggerproc != nil: db.loggerproc(db, s, 0)
   let query = db.prepareSql(s)
@@ -412,7 +390,8 @@ proc getTheString*(db: SQLiteral, statement: enum, params: varargs[DbValue, toDb
 
 
 proc getTheString*(db: SQLiteral, s: string): string {.inline.} =
-  ## | Dynamically prepares, executes and finalizes given query and returns value of TEXT -type column at column index 0 of first result row.
+  ## | Dynamically prepares, executes and finalizes given query and returns value of TEXT -type
+  ## column at column index 0 of first result row.
   ## | If query does not return any rows, returns empty string.
   if(unlikely) db.loggerproc != nil: db.loggerproc(db, s, 0)
   let query = db.prepareSql(s)
@@ -601,8 +580,6 @@ template transaction*(db: var SQLiteral, statepartition: uint32, body: untyped) 
       db.intransaction = false
       raise ex
     finally:
-      db.partitions[statepartition].inc 
-      if(unlikely) db.partitions[statepartition] > 2000000000: db.partitions[statepartition].dec(2000000000)
       if db.intransaction:
         db.exec(db.Commit)
         if db.oncommitproc != nil: db.oncommitproc(db)
@@ -642,14 +619,16 @@ proc createStatement(db: var SQLiteral, statement: enum) =
   if index > db.laststatementindex: db.laststatementindex = index
 
 
-proc setLogger*(db: var SQLiteral, logger: proc(sqliteral: SQLiteral, statement: string, code: int) {.gcsafe, raises: [].}, paramtruncat = 50) =
+proc setLogger*(db: var SQLiteral, logger: proc(sqliteral: SQLiteral, statement: string, code: int)
+ {.gcsafe, raises: [].}, paramtruncat = 50) =
   ## Set callback procedure to gather all executed statements with their parameters.
   ## 
   ## If code > 0, log concerns sqlite error with error code in question.
   ## 
-  ## If code == -1, log may be of minor interest (originating from exes or statement preparation).
+  ## If code == -1, log may be of minor interest (originating from `exes` or statement preparation).
   ##
-  ## Paramtruncat parameter limits the maximum log length of parameters so that long inputs won't clutter logs. Value < 1 disables truncation.
+  ## Paramtruncat parameter limits the maximum log length of parameters so that long inputs won't
+  ## clutter logs. Value < 1 disables truncation.
   ##
   ## You can use the same logger for multiple sqliterals, the caller is also given as parameter.
   db.maxparamloggedlen = paramtruncat
@@ -659,10 +638,11 @@ proc setLogger*(db: var SQLiteral, logger: proc(sqliteral: SQLiteral, statement:
 proc setOnCommitCallback*(db: var SQLiteral, oncommit: proc(sqliteral: SQLiteral) {.gcsafe, raises: [].}) =
   ## Set callback procedure that is triggered inside transaction proc, when commit to database has been executed.
   db.oncommitproc = oncommit
-  
 
-proc openDatabase*(db: var SQLiteral, dbname: string, schema: string, Statements: typedesc[enum], maxKbSize = 0, wal = true) =
-  ## Opens an exclusive connection, boots up the database, executes given schema and prepares given statements.
+
+proc openDatabase*(db: var SQLiteral, dbname: string, schemas: openArray[string],
+ Statements: typedesc[enum], maxKbSize = 0, wal = true) =
+  ## Opens an exclusive connection, boots up the database, executes given schemas and prepares given statements.
   ## 
   ## If dbname is not a path, current working directory will be used.
   ## 
@@ -691,14 +671,20 @@ proc openDatabase*(db: var SQLiteral, dbname: string, schema: string, Statements
     db.maxsize = maxKbSize
     let pagesize = db.getTheInt("PRAGMA page_size")
     db.exes("PRAGMA max_page_count = " & $(maxKbSize * 1024 div pagesize))
-  db.exes(schema)
+  for schema in schemas: db.exes(schema)
   db.Transaction = db.prepareSql("BEGIN IMMEDIATE".cstring)
   db.Commit = db.prepareSql("COMMIT".cstring)
   db.Rollback = db.prepareSql("ROLLBACK".cstring)
   for v in low(Statements) .. high(Statements): db.createStatement(v) #ord(v), ($v).cstring)
   if db.loggerproc != nil: db.loggerproc(db, "opened", -1)
   elif defined(fulldebug): echo "notice: fulldebug defined but logger not set for ", db.dbname
+  
 
+proc openDatabase*(db: var SQLiteral, dbname: string, schema: string,
+ Statements: typedesc[enum], maxKbSize = 0, wal = true) {.inline.} =
+  ## Open database with a single schema.
+  openDatabase(db, dbname, [schema], Statements, maxKbSize, wal)
+  
 
 proc setReadonly*(db: var SQLiteral, readonly: bool) =
   ## When in readonly mode:
@@ -751,8 +737,53 @@ proc optimize*(db: var SQLiteral, pagesize = -1, walautocheckpoint = -1) =
     release(db.transactionlock)
 
 
+proc initBackup*(db: SQLiteral, backupfilename: string):
+ tuple[backupdb: Psqlite3, backuphandle: PSqlite3_Backup] =
+  ## Initializes backup processing, returning variables to use with `stepBackup` proc.
+  ## 
+  ## Note that `close` will fail with SQLITE_BUSY if there's an unfinished backup process going on.
+  db.checkRc(open(backupfilename, result.backupdb))
+  result.backuphandle = backup_init(result.backupdb, "main".cstring, db.sqlite, "main".cstring)
+  if result.backuphandle == nil: db.checkRc(SQLITE_NULL)
+  if db.loggerproc != nil: db.loggerproc(db, "backup to " & backupfilename, 0)
+
+
+proc stepBackup*(db: SQLiteral, backupdb: Psqlite3, backuphandle: PSqlite3_Backup, pagesperportion = 5.int32): int =
+  ## Backs up a portion of the database pages (default: 5) to a destination initialized with `initBackup`.
+  ##
+  ## Returns percentage of progress; 100% means that backup has been finished.
+  ## 
+  ## The idea `(check example 2)<https://sqlite.org/backup.html>`_ is to put the thread to sleep
+  ## between portions so that other operations can proceed concurrently.
+  ##
+  ## **Example:**
+  ## 
+  ## .. code-block:: Nim
+  ##  
+  ##  from os import sleep 
+  ##  let (backupdb , backuphandle) = db.initBackup("./backup.db")
+  ##  var progress: int
+  ##  while progress < 100:
+  ##    sleep(250)
+  ##    progress = db.stepBackup(backupdb, backuphandle)
+  ## 
+  if unlikely(backupdb == nil or backuphandle == nil): db.checkRc(SQLITE_NULL)
+  var rc = backup_step(backuphandle, pagesperportion)
+  if rc == SQLITE_DONE:
+    db.checkRc(backup_finish(backuphandle))
+    db.checkRc(backupdb.close())
+    if db.loggerproc != nil: db.loggerproc(db, "backup ok", 0)
+    return 100
+  if rc notin [SQLITE_OK, SQLITE_BUSY, SQLITE_LOCKED]:
+    if db.loggerproc != nil: db.loggerproc(db, "backup failed", rc)
+    discard backup_finish(backuphandle)
+    discard backupdb.close()
+    db.checkRc(rc)
+  return 100 * (backuphandle.backup_pagecount - backuphandle.backup_remaining) div backuphandle.backup_pagecount
+
+
 proc about*(db: SQLiteral) =
-  ## Echoes some info about the database
+  ## Echoes some info about the database.
   echo ""
   echo db.dbname & ": "
   echo "SQLiteral=", SQLiteralVersion
@@ -782,7 +813,7 @@ proc finalizeStatements(db: var SQLiteral) =
 
 
 proc close*(db: var SQLiteral) =
-  ## Closes the database
+  ## Closes the database.
   if db.laststatementindex == -1: return
   var rc = 0
   acquire(db.transactionlock)

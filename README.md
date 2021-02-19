@@ -12,18 +12,12 @@ http://htmlpreview.github.io/?https://github.com/olliNiinivaara/SQLiteral/blob/m
 
 ## Change log
 
-**1.2.0 (2020-11-23)**
-* requires nim 1.4.0+ (older versions might work too, but not tested)
-* supports string views with --experimental:views compile flag
-* onCommitCallback
-* Text deprecated
-* partition states deprecated
+**1.3.0 (2021-02-19)**
+* take backup concurrently
+* database open supports multiple schemas
+* partition states removed
 
 ## Roadmap
-
-**1.3.0**
-* backups in background thread: https://sqlite.org/backup.html example 2
-* remove partition states
 
 **1.4.0** https://www.sqlite.org/json1.html
 

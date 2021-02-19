@@ -55,7 +55,6 @@ function main() {
 </script>
 
 <style>
-
 /*
 Stylesheet for use with Docutils/rst2html.
 
@@ -213,7 +212,6 @@ body {
 
 .three.columns {
   width: 22%;
-  line-break: anywhere;
 }
 
 .nine.columns {
@@ -469,7 +467,7 @@ ol ul {
   margin-bottom: 0;
   margin-left: 1.25em; }
 
-li {
+ul.simple > li {
     list-style-type: circle;
 }
 
@@ -1005,7 +1003,7 @@ span.attachedType {
   <ul class="simple simple-toc-section">
       <li><a class="reference" href="#SQLError"
     title="SQLError = object of CatchableError
-  rescode*: int"><wbr />SQLError<span class="attachedType"></span></a></li>
+  rescode*: int">SQLError</a></li>
   <li><a class="reference" href="#SQLiteral"
     title="SQLiteral = object
   sqlite*: PSqlite3
@@ -1014,7 +1012,6 @@ span.attachedType {
   intransaction: bool
   walmode: bool
   maxsize: int
-  partitions: array[100, uint32]
   transactionlock: Lock
   preparedstatements: array[MaxStatements, PStmt]
   laststatementindex: int
@@ -1024,7 +1021,7 @@ span.attachedType {
   maxparamloggedlen: int
   Transaction: PStmt
   Commit: PStmt
-  Rollback: PStmt"><wbr />SQLiteral<span class="attachedType"></span></a></li>
+  Rollback: PStmt">SQLiteral</a></li>
   <li><a class="reference" href="#DbValue"
     title="DbValue = object
   case kind*: DbValueKind
@@ -1039,17 +1036,19 @@ span.attachedType {
                                ## (unfortunately nimdoc does not support the feature.)
     
   of sqliteBlob:
-      blobVal*: seq[byte]"><wbr />Db<wbr />Value<span class="attachedType"></span></a></li>
+      blobVal*: seq[byte]">DbValue</a></li>
   <li><a class="reference" href="#Text"
-    title="Text = tuple[data: ptr UncheckedArray[char], len: int32]"><wbr />Text<span class="attachedType"></span></a></li>
+    title="Text = tuple[data: ptr UncheckedArray[char], len: int32]">Text</a></li>
 
   </ul>
 </li>
 <li>
   <a class="reference reference-toplevel" href="#10" id="60">Consts</a>
   <ul class="simple simple-toc-section">
-      <li><a class="reference" href="#MaxStatements"
-    title="MaxStatements = 100"><wbr />Max<wbr />Statements<span class="attachedType"></span></a></li>
+      <li><a class="reference" href="#SQLiteralVersion"
+    title="SQLiteralVersion = &quot;1.3.0&quot;">SQLiteralVersion</a></li>
+  <li><a class="reference" href="#MaxStatements"
+    title="MaxStatements = 100">MaxStatements</a></li>
 
   </ul>
 </li>
@@ -1058,191 +1057,196 @@ span.attachedType {
   <ul class="simple simple-toc-section">
       <ul class="simple nested-toc-section">columnExists
       <li><a class="reference" href="#columnExists%2CSQLiteral%2Cstring%2Cstring"
-    title="columnExists(db: SQLiteral; table: string; column: string): bool">columnExists,SQLiteral,string,string<span class="attachedType">SQLiteral</span></a></li>
+    title="columnExists(db: SQLiteral; table: string; column: string): bool">columnExists,<wbr>SQLiteral,<wbr>string,<wbr>string</a></li>
 
   </ul>
   <ul class="simple nested-toc-section">$
       <li><a class="reference" href="#%24%2CText"
-    title="`$`(text: Text): string">$,Text<span class="attachedType">Text</span></a></li>
+    title="`$`(text: Text): string">$,<wbr>Text</a></li>
   <li><a class="reference" href="#%24%2CT"
-    title="`$`[T: DbValue](val: T): string">$,T<span class="attachedType"></span></a></li>
+    title="`$`[T: DbValue](val: T): string">$,<wbr>T</a></li>
 
   </ul>
   <ul class="simple nested-toc-section">getInt
       <li><a class="reference" href="#getInt%2CPStmt%2Cint32"
-    title="getInt(prepared: PStmt; col: int32 = 0): int64">getInt,PStmt,int32<span class="attachedType"></span></a></li>
+    title="getInt(prepared: PStmt; col: int32 = 0): int64">getInt,<wbr>PStmt,<wbr>int32</a></li>
 
   </ul>
   <ul class="simple nested-toc-section">prepareSql
       <li><a class="reference" href="#prepareSql%2CSQLiteral%2Ccstring"
-    title="prepareSql(db: SQLiteral; sql: cstring): PStmt">prepareSql,SQLiteral,cstring<span class="attachedType">SQLiteral</span></a></li>
+    title="prepareSql(db: SQLiteral; sql: cstring): PStmt">prepareSql,<wbr>SQLiteral,<wbr>cstring</a></li>
 
   </ul>
   <ul class="simple nested-toc-section">getTheInt
       <li><a class="reference" href="#getTheInt%2CSQLiteral%2C%2Cvarargs%5BDbValue%2CtoDb%5D"
-    title="getTheInt(db: SQLiteral; statement: enum; params: varargs[DbValue, toDb]): int64">getTheInt,SQLiteral,,varargs[DbValue,toDb]<span class="attachedType">SQLiteral</span></a></li>
+    title="getTheInt(db: SQLiteral; statement: enum; params: varargs[DbValue, toDb]): int64">getTheInt,<wbr>SQLiteral,<wbr>,<wbr>varargs[DbValue,<wbr>toDb]</a></li>
   <li><a class="reference" href="#getTheInt%2CSQLiteral%2Cstring"
-    title="getTheInt(db: SQLiteral; s: string): int64">getTheInt,SQLiteral,string<span class="attachedType">SQLiteral</span></a></li>
+    title="getTheInt(db: SQLiteral; s: string): int64">getTheInt,<wbr>SQLiteral,<wbr>string</a></li>
 
   </ul>
   <ul class="simple nested-toc-section">close
       <li><a class="reference" href="#close%2CSQLiteral"
-    title="close(db: var SQLiteral)">close,SQLiteral<span class="attachedType">SQLiteral</span></a></li>
+    title="close(db: var SQLiteral)">close,<wbr>SQLiteral</a></li>
 
   </ul>
   <ul class="simple nested-toc-section">substr
       <li><a class="reference" href="#substr%2CText%2Cint%2Cint"
-    title="substr(text: Text; start: int; last: int): string">substr,Text,int,int<span class="attachedType">Text</span></a></li>
+    title="substr(text: Text; start: int; last: int): string">substr,<wbr>Text,<wbr>int,<wbr>int</a></li>
+
+  </ul>
+  <ul class="simple nested-toc-section">initBackup
+      <li><a class="reference" href="#initBackup%2CSQLiteral%2Cstring"
+    title="initBackup(db: SQLiteral; backupfilename: string): tuple[backupdb: PSqlite3,
+    backuphandle: PSqlite3_Backup]">initBackup,<wbr>SQLiteral,<wbr>string</a></li>
 
   </ul>
   <ul class="simple nested-toc-section">getLastInsertRowid
       <li><a class="reference" href="#getLastInsertRowid%2CSQLiteral"
-    title="getLastInsertRowid(db: SQLiteral): int64">getLastInsertRowid,SQLiteral<span class="attachedType">SQLiteral</span></a></li>
-
-  </ul>
-  <ul class="simple nested-toc-section">changeState
-      <li><a class="reference" href="#changeState%2CSQLiteral%2Cuint32"
-    title="changeState(db: var SQLiteral; partition: uint32 = 0): uint32">changeState,SQLiteral,uint32<span class="attachedType">SQLiteral</span></a></li>
+    title="getLastInsertRowid(db: SQLiteral): int64">getLastInsertRowid,<wbr>SQLiteral</a></li>
 
   </ul>
   <ul class="simple nested-toc-section">len
       <li><a class="reference" href="#len%2CText"
-    title="len(text: Text): int">len,Text<span class="attachedType">Text</span></a></li>
+    title="len(text: Text): int">len,<wbr>Text</a></li>
 
   </ul>
   <ul class="simple nested-toc-section">getCString
       <li><a class="reference" href="#getCString%2CPStmt%2Cint32"
-    title="getCString(prepared: PStmt; col: int32 = 0): cstring">getCString,PStmt,int32<span class="attachedType"></span></a></li>
+    title="getCString(prepared: PStmt; col: int32 = 0): cstring">getCString,<wbr>PStmt,<wbr>int32</a></li>
 
   </ul>
   <ul class="simple nested-toc-section">getString
       <li><a class="reference" href="#getString%2CPStmt%2Cint32"
-    title="getString(prepared: PStmt; col: int32 = 0): string">getString,PStmt,int32<span class="attachedType"></span></a></li>
+    title="getString(prepared: PStmt; col: int32 = 0): string">getString,<wbr>PStmt,<wbr>int32</a></li>
 
   </ul>
   <ul class="simple nested-toc-section">getFloat
       <li><a class="reference" href="#getFloat%2CPStmt%2Cint32"
-    title="getFloat(prepared: PStmt; col: int32 = 0): float64">getFloat,PStmt,int32<span class="attachedType"></span></a></li>
+    title="getFloat(prepared: PStmt; col: int32 = 0): float64">getFloat,<wbr>PStmt,<wbr>int32</a></li>
 
   </ul>
   <ul class="simple nested-toc-section">isIntransaction
       <li><a class="reference" href="#isIntransaction%2CSQLiteral"
-    title="isIntransaction(db: SQLiteral): bool">isIntransaction,SQLiteral<span class="attachedType">SQLiteral</span></a></li>
+    title="isIntransaction(db: SQLiteral): bool">isIntransaction,<wbr>SQLiteral</a></li>
 
   </ul>
   <ul class="simple nested-toc-section">openDatabase
-      <li><a class="reference" href="#openDatabase%2CSQLiteral%2Cstring%2Cstring%2Ctypedesc%5B%5D%2Cint"
+      <li><a class="reference" href="#openDatabase%2CSQLiteral%2Cstring%2CopenArray%5Bstring%5D%2Ctypedesc%5B%5D%2Cint"
+    title="openDatabase(db: var SQLiteral; dbname: string; schemas: openArray[string];
+             Statements: typedesc[enum]; maxKbSize = 0; wal = true)">openDatabase,<wbr>SQLiteral,<wbr>string,<wbr>openArray[string],<wbr>typedesc[],<wbr>int</a></li>
+  <li><a class="reference" href="#openDatabase%2CSQLiteral%2Cstring%2Cstring%2Ctypedesc%5B%5D%2Cint"
     title="openDatabase(db: var SQLiteral; dbname: string; schema: string;
-             Statements: typedesc[enum]; maxKbSize = 0; wal = true)">openDatabase,SQLiteral,string,string,typedesc[],int<span class="attachedType">SQLiteral</span></a></li>
+             Statements: typedesc[enum]; maxKbSize = 0; wal = true)">openDatabase,<wbr>SQLiteral,<wbr>string,<wbr>string,<wbr>typedesc[],<wbr>int</a></li>
 
   </ul>
   <ul class="simple nested-toc-section">optimize
       <li><a class="reference" href="#optimize%2CSQLiteral"
-    title="optimize(db: var SQLiteral; pagesize = -1; walautocheckpoint = -1)">optimize,SQLiteral<span class="attachedType">SQLiteral</span></a></li>
+    title="optimize(db: var SQLiteral; pagesize = -1; walautocheckpoint = -1)">optimize,<wbr>SQLiteral</a></li>
 
   </ul>
   <ul class="simple nested-toc-section">getTheString
       <li><a class="reference" href="#getTheString%2CSQLiteral%2C%2Cvarargs%5BDbValue%2CtoDb%5D"
-    title="getTheString(db: SQLiteral; statement: enum; params: varargs[DbValue, toDb]): string">getTheString,SQLiteral,,varargs[DbValue,toDb]<span class="attachedType">SQLiteral</span></a></li>
+    title="getTheString(db: SQLiteral; statement: enum; params: varargs[DbValue, toDb]): string">getTheString,<wbr>SQLiteral,<wbr>,<wbr>varargs[DbValue,<wbr>toDb]</a></li>
   <li><a class="reference" href="#getTheString%2CSQLiteral%2Cstring"
-    title="getTheString(db: SQLiteral; s: string): string">getTheString,SQLiteral,string<span class="attachedType">SQLiteral</span></a></li>
-
-  </ul>
-  <ul class="simple nested-toc-section">getState
-      <li><a class="reference" href="#getState%2CSQLiteral%2Cuint32"
-    title="getState(db: var SQLiteral; partition: uint32 = 0): uint32">getState,SQLiteral,uint32<span class="attachedType">SQLiteral</span></a></li>
+    title="getTheString(db: SQLiteral; s: string): string">getTheString,<wbr>SQLiteral,<wbr>string</a></li>
 
   </ul>
   <ul class="simple nested-toc-section">insert
       <li><a class="reference" href="#insert%2CSQLiteral%2C%2Cvarargs%5BDbValue%2CtoDb%5D"
-    title="insert(db: SQLiteral; statement: enum; params: varargs[DbValue, toDb]): int64">insert,SQLiteral,,varargs[DbValue,toDb]<span class="attachedType">SQLiteral</span></a></li>
+    title="insert(db: SQLiteral; statement: enum; params: varargs[DbValue, toDb]): int64">insert,<wbr>SQLiteral,<wbr>,<wbr>varargs[DbValue,<wbr>toDb]</a></li>
 
   </ul>
   <ul class="simple nested-toc-section">setReadonly
       <li><a class="reference" href="#setReadonly%2CSQLiteral%2Cbool"
-    title="setReadonly(db: var SQLiteral; readonly: bool)">setReadonly,SQLiteral,bool<span class="attachedType">SQLiteral</span></a></li>
+    title="setReadonly(db: var SQLiteral; readonly: bool)">setReadonly,<wbr>SQLiteral,<wbr>bool</a></li>
 
   </ul>
   <ul class="simple nested-toc-section">getSeq
       <li><a class="reference" href="#getSeq%2CPStmt%2Cint32"
-    title="getSeq(prepared: PStmt; col: int32 = 0): seq[byte]">getSeq,PStmt,int32<span class="attachedType"></span></a></li>
+    title="getSeq(prepared: PStmt; col: int32 = 0): seq[byte]">getSeq,<wbr>PStmt,<wbr>int32</a></li>
 
   </ul>
   <ul class="simple nested-toc-section">exec
       <li><a class="reference" href="#exec%2CSQLiteral%2CPStmt%2Cvarargs%5BDbValue%2CtoDb%5D"
-    title="exec(db: SQLiteral; pstatement: PStmt; params: varargs[DbValue, toDb])">exec,SQLiteral,PStmt,varargs[DbValue,toDb]<span class="attachedType">SQLiteral</span></a></li>
+    title="exec(db: SQLiteral; pstatement: PStmt; params: varargs[DbValue, toDb])">exec,<wbr>SQLiteral,<wbr>PStmt,<wbr>varargs[DbValue,<wbr>toDb]</a></li>
   <li><a class="reference" href="#exec%2CSQLiteral%2C%2Cvarargs%5BDbValue%2CtoDb%5D"
-    title="exec(db: SQLiteral; statement: enum; params: varargs[DbValue, toDb])">exec,SQLiteral,,varargs[DbValue,toDb]<span class="attachedType">SQLiteral</span></a></li>
+    title="exec(db: SQLiteral; statement: enum; params: varargs[DbValue, toDb])">exec,<wbr>SQLiteral,<wbr>,<wbr>varargs[DbValue,<wbr>toDb]</a></li>
 
   </ul>
   <ul class="simple nested-toc-section">toDb
       <li><a class="reference" href="#toDb%2CT"
-    title="toDb[T: Ordinal](val: T): DbValue">toDb,T<span class="attachedType">DbValue</span></a></li>
+    title="toDb[T: Ordinal](val: T): DbValue">toDb,<wbr>T</a></li>
   <li><a class="reference" href="#toDb%2CT_2"
-    title="toDb[T: SomeFloat](val: T): DbValue">toDb,T_2<span class="attachedType">DbValue</span></a></li>
+    title="toDb[T: SomeFloat](val: T): DbValue">toDb,<wbr>T_2</a></li>
   <li><a class="reference" href="#toDb%2CT_3"
-    title="toDb[T: string](val: T): DbValue">toDb,T_3<span class="attachedType">DbValue</span></a></li>
+    title="toDb[T: string](val: T): DbValue">toDb,<wbr>T_3</a></li>
   <li><a class="reference" href="#toDb%2CT_4"
-    title="toDb[T: Text](val: T): DbValue">toDb,T_4<span class="attachedType">DbValue</span></a></li>
+    title="toDb[T: Text](val: T): DbValue">toDb,<wbr>T_4</a></li>
   <li><a class="reference" href="#toDb%2CT_5"
-    title="toDb[T: seq[byte]](val: T): DbValue">toDb,T_5<span class="attachedType">DbValue</span></a></li>
+    title="toDb[T: seq[byte]](val: T): DbValue">toDb,<wbr>T_5</a></li>
   <li><a class="reference" href="#toDb%2CT_6"
-    title="toDb[T: DbValue](val: T): DbValue">toDb,T_6<span class="attachedType">DbValue</span></a></li>
+    title="toDb[T: DbValue](val: T): DbValue">toDb,<wbr>T_6</a></li>
 
   </ul>
   <ul class="simple nested-toc-section">exes
       <li><a class="reference" href="#exes%2CSQLiteral%2Cstring"
-    title="exes(db: SQLiteral; sql: string)">exes,SQLiteral,string<span class="attachedType">SQLiteral</span></a></li>
+    title="exes(db: SQLiteral; sql: string)">exes,<wbr>SQLiteral,<wbr>string</a></li>
 
   </ul>
   <ul class="simple nested-toc-section">setOnCommitCallback
       <li><a class="reference" href="#setOnCommitCallback%2CSQLiteral%2Cproc%28SQLiteral%29"
     title="setOnCommitCallback(db: var SQLiteral;
-                    oncommit: proc (sqliteral: SQLiteral) {.gcsafe, raises: [].})">setOnCommitCallback,SQLiteral,proc(SQLiteral)<span class="attachedType">SQLiteral</span></a></li>
+                    oncommit: proc (sqliteral: SQLiteral) {.gcsafe, raises: [].})">setOnCommitCallback,<wbr>SQLiteral,<wbr>proc(SQLiteral)</a></li>
 
   </ul>
   <ul class="simple nested-toc-section">rowExists
       <li><a class="reference" href="#rowExists%2CSQLiteral%2C%2Cvarargs%5BDbValue%2CtoDb%5D"
-    title="rowExists(db: SQLiteral; statement: enum; params: varargs[DbValue, toDb]): bool">rowExists,SQLiteral,,varargs[DbValue,toDb]<span class="attachedType">SQLiteral</span></a></li>
+    title="rowExists(db: SQLiteral; statement: enum; params: varargs[DbValue, toDb]): bool">rowExists,<wbr>SQLiteral,<wbr>,<wbr>varargs[DbValue,<wbr>toDb]</a></li>
   <li><a class="reference" href="#rowExists%2CSQLiteral%2Cstring"
-    title="rowExists(db: SQLiteral; sql: string): bool">rowExists,SQLiteral,string<span class="attachedType">SQLiteral</span></a></li>
+    title="rowExists(db: SQLiteral; sql: string): bool">rowExists,<wbr>SQLiteral,<wbr>string</a></li>
 
   </ul>
   <ul class="simple nested-toc-section">setLogger
       <li><a class="reference" href="#setLogger%2CSQLiteral%2Cproc%28SQLiteral%2Cstring%2Cint%29%2Cint"
     title="setLogger(db: var SQLiteral; logger: proc (sqliteral: SQLiteral;
-    statement: string; code: int) {.gcsafe, raises: [].}; paramtruncat = 50)">setLogger,SQLiteral,proc(SQLiteral,string,int),int<span class="attachedType">SQLiteral</span></a></li>
+    statement: string; code: int) {.gcsafe, raises: [].}; paramtruncat = 50)">setLogger,<wbr>SQLiteral,<wbr>proc(SQLiteral,<wbr>string,<wbr>int),<wbr>int</a></li>
 
   </ul>
   <ul class="simple nested-toc-section">equals
       <li><a class="reference" href="#equals%2CText%2Cstring"
-    title="equals(text: Text; str: string): bool">equals,Text,string<span class="attachedType">Text</span></a></li>
+    title="equals(text: Text; str: string): bool">equals,<wbr>Text,<wbr>string</a></li>
 
   </ul>
   <ul class="simple nested-toc-section">update
       <li><a class="reference" href="#update%2CSQLiteral%2Cstring%2Cstring%2CDbValue%2CDbValue"
     title="update(db: SQLiteral; sql: string; column: string; newvalue: DbValue;
-       where: DbValue)">update,SQLiteral,string,string,DbValue,DbValue<span class="attachedType">SQLiteral</span></a></li>
+       where: DbValue)">update,<wbr>SQLiteral,<wbr>string,<wbr>string,<wbr>DbValue,<wbr>DbValue</a></li>
 
   </ul>
-  <ul class="simple nested-toc-section">about
-      <li><a class="reference" href="#about%2CSQLiteral"
-    title="about(db: SQLiteral)">about,SQLiteral<span class="attachedType">SQLiteral</span></a></li>
+  <ul class="simple nested-toc-section">stepBackup
+      <li><a class="reference" href="#stepBackup%2CSQLiteral%2CPSqlite3%2CPSqlite3_Backup"
+    title="stepBackup(db: SQLiteral; backupdb: PSqlite3; backuphandle: PSqlite3_Backup;
+           pagesperportion = 5.int32): int">stepBackup,<wbr>SQLiteral,<wbr>PSqlite3,<wbr>PSqlite3_Backup</a></li>
 
   </ul>
   <ul class="simple nested-toc-section">asText
       <li><a class="reference" href="#asText%2Cstring%2Cint%2Cint"
-    title="asText(fromstring: string; start: int; last: int): Text">asText,string,int,int<span class="attachedType">Text</span></a></li>
+    title="asText(fromstring: string; start: int; last: int): Text">asText,<wbr>string,<wbr>int,<wbr>int</a></li>
 
   </ul>
   <ul class="simple nested-toc-section">doLog
       <li><a class="reference" href="#doLog%2CSQLiteral%2Cstring%2Cvarargs%5BDbValue%2CtoDb%5D"
-    title="doLog(db: SQLiteral; statement: string; params: varargs[DbValue, toDb])">doLog,SQLiteral,string,varargs[DbValue,toDb]<span class="attachedType">SQLiteral</span></a></li>
+    title="doLog(db: SQLiteral; statement: string; params: varargs[DbValue, toDb])">doLog,<wbr>SQLiteral,<wbr>string,<wbr>varargs[DbValue,<wbr>toDb]</a></li>
+
+  </ul>
+  <ul class="simple nested-toc-section">about
+      <li><a class="reference" href="#about%2CSQLiteral"
+    title="about(db: SQLiteral)">about,<wbr>SQLiteral</a></li>
 
   </ul>
   <ul class="simple nested-toc-section">bindParams
       <li><a class="reference" href="#bindParams%2CPStmt%2Cvarargs%5BDbValue%5D"
-    title="bindParams(sql: PStmt; params: varargs[DbValue]): int">bindParams,PStmt,varargs[DbValue]<span class="attachedType">DbValue</span></a></li>
+    title="bindParams(sql: PStmt; params: varargs[DbValue]): int">bindParams,<wbr>PStmt,<wbr>varargs[DbValue]</a></li>
 
   </ul>
 
@@ -1252,9 +1256,9 @@ span.attachedType {
   <a class="reference reference-toplevel" href="#15" id="65">Iterators</a>
   <ul class="simple simple-toc-section">
       <li><a class="reference" href="#rows.i%2CSQLiteral%2C%2Cvarargs%5BDbValue%2CtoDb%5D"
-    title="rows(db: SQLiteral; statement: enum; params: varargs[DbValue, toDb]): PStmt"><wbr />rows<span class="attachedType">SQLiteral</span></a></li>
+    title="rows(db: SQLiteral; statement: enum; params: varargs[DbValue, toDb]): PStmt">rows</a></li>
   <li><a class="reference" href="#rows.i%2CSQLiteral%2CPStmt%2Cvarargs%5BDbValue%2CtoDb%5D"
-    title="rows(db: SQLiteral; pstatement: PStmt; params: varargs[DbValue, toDb]): PStmt"><wbr />rows<span class="attachedType">SQLiteral</span></a></li>
+    title="rows(db: SQLiteral; pstatement: PStmt; params: varargs[DbValue, toDb]): PStmt">rows</a></li>
 
   </ul>
 </li>
@@ -1262,23 +1266,23 @@ span.attachedType {
   <a class="reference reference-toplevel" href="#18" id="68">Templates</a>
   <ul class="simple simple-toc-section">
       <li><a class="reference" href="#checkRc.t%2CSQLiteral%2Cint"
-    title="checkRc(db: SQLiteral; resultcode: int)"><wbr />check<wbr />Rc<span class="attachedType">SQLiteral</span></a></li>
+    title="checkRc(db: SQLiteral; resultcode: int)">checkRc</a></li>
   <li><a class="reference" href="#withRow.t%2CSQLiteral%2Cstring%2Cuntyped%2Cuntyped"
-    title="withRow(db: SQLiteral; sql: string; row, body: untyped)"><wbr />with<wbr />Row<span class="attachedType">SQLiteral</span></a></li>
+    title="withRow(db: SQLiteral; sql: string; row, body: untyped)">withRow</a></li>
   <li><a class="reference" href="#withRowOr.t%2CSQLiteral%2Cstring%2Cuntyped%2Cuntyped%2Cuntyped"
-    title="withRowOr(db: SQLiteral; sql: string; row, body1, body2: untyped)"><wbr />with<wbr />Row<wbr />Or<span class="attachedType">SQLiteral</span></a></li>
+    title="withRowOr(db: SQLiteral; sql: string; row, body1, body2: untyped)">withRowOr</a></li>
   <li><a class="reference" href="#withRow.t%2CSQLiteral%2C%2Cvarargs%5BDbValue%2CtoDb%5D%2Cuntyped%2Cuntyped"
     title="withRow(db: SQLiteral; statement: enum; params: varargs[DbValue, toDb];
-        row, body: untyped)"><wbr />with<wbr />Row<span class="attachedType">SQLiteral</span></a></li>
+        row, body: untyped)">withRow</a></li>
   <li><a class="reference" href="#withRowOr.t%2CSQLiteral%2C%2Cvarargs%5BDbValue%2CtoDb%5D%2Cuntyped%2Cuntyped%2Cuntyped"
     title="withRowOr(db: SQLiteral; statement: enum; params: varargs[DbValue, toDb];
-          row, body1, body2: untyped)"><wbr />with<wbr />Row<wbr />Or<span class="attachedType">SQLiteral</span></a></li>
+          row, body1, body2: untyped)">withRowOr</a></li>
   <li><a class="reference" href="#transaction.t%2CSQLiteral%2Cuint32%2Cuntyped"
-    title="transaction(db: var SQLiteral; statepartition: uint32; body: untyped)"><wbr />transaction<span class="attachedType">SQLiteral</span></a></li>
+    title="transaction(db: var SQLiteral; statepartition: uint32; body: untyped)">transaction</a></li>
   <li><a class="reference" href="#transaction.t%2CSQLiteral%2Cuntyped"
-    title="transaction(db: SQLiteral; body: untyped)"><wbr />transaction<span class="attachedType">SQLiteral</span></a></li>
+    title="transaction(db: SQLiteral; body: untyped)">transaction</a></li>
   <li><a class="reference" href="#transactionsDisabled.t%2CSQLiteral%2Cuntyped"
-    title="transactionsDisabled(db: var SQLiteral; body: untyped)"><wbr />transactions<wbr />Disabled<span class="attachedType">SQLiteral</span></a></li>
+    title="transactionsDisabled(db: var SQLiteral; body: untyped)">transactionsDisabled</a></li>
 
   </ul>
 </li>
@@ -1289,7 +1293,7 @@ span.attachedType {
   <div class="nine columns" id="content">
   <div id="tocRoot"></div>
   
-  <p class="module-desc">A high level SQLite API with support for multi-threading, prepared statements, proper typing, zero-copy string views, state syncing, debugging executed statements, static binding to sqlite3.c of your choice, optimizing, and more.
+  <p class="module-desc">A high level SQLite API with support for multi-threading, prepared statements, proper typing, zero-copy string views, debugging executed statements, static binding to sqlite3.c of your choice, optimizing, backups, and more.
 <h1><a class="toc-backref" id="a-complete-example" href="#a-complete-example">A Complete Example</a></h1><pre class="listing"><span class="Keyword">import</span> <span class="Identifier">sqliteral</span>
 
 <span class="Keyword">const</span>
@@ -1371,7 +1375,6 @@ span.attachedType {
   <span class="Identifier">intransaction</span><span class="Other">:</span> <span class="Identifier">bool</span>
   <span class="Identifier">walmode</span><span class="Other">:</span> <span class="Identifier">bool</span>
   <span class="Identifier">maxsize</span><span class="Other">:</span> <span class="Identifier">int</span>
-  <span class="Identifier">partitions</span><span class="Other">:</span> <span class="Identifier">array</span><span class="Other">[</span><span class="DecNumber">100</span><span class="Other">,</span> <span class="Identifier">uint32</span><span class="Other">]</span>
   <span class="Identifier">transactionlock</span><span class="Other">:</span> <span class="Identifier">Lock</span>
   <span class="Identifier">preparedstatements</span><span class="Other">:</span> <span class="Identifier">array</span><span class="Other">[</span><span class="Identifier">MaxStatements</span><span class="Other">,</span> <span class="Identifier">PStmt</span><span class="Other">]</span>
   <span class="Identifier">laststatementindex</span><span class="Other">:</span> <span class="Identifier">int</span>
@@ -1414,7 +1417,7 @@ span.attachedType {
 <dt><pre><a href="sqliteral.html#Text"><span class="Identifier">Text</span></a> <span class="Other">=</span> <span class="Keyword">tuple</span><span class="Other">[</span><span class="Identifier">data</span><span class="Other">:</span> <span class="Keyword">ptr</span> <span class="Identifier">UncheckedArray</span><span class="Other">[</span><span class="Identifier">char</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">len</span><span class="Other">:</span> <span class="Identifier">int32</span><span class="Other">]</span></pre></dt>
 <dd>
 
-<p>Compile with --experimental:views to get proper language-supported zero-copy views to slices of existing strings. This hack is deprecated and will be removed when views become official!</p>
+<p>Compile with --experimental:views to get proper language-supported zero-copy views to slices of existing strings. Current hack is deprecated and will be removed when views become official...</p>
 <p>To avoid copying strings, SQLiteral offers Text as a zero-copy view to a slice of existing string</p>
 <p><strong>Example:</strong></p>
 <pre class="listing"><span class="Keyword">var</span> <span class="Identifier">buffer</span> <span class="Operator">=</span> <span class="LongStringLit">&quot;&quot;&quot;{&quot;sentence&quot;: &quot;Call me Ishmael&quot;}&quot;&quot;&quot;</span>
@@ -1428,6 +1431,13 @@ span.attachedType {
 <div class="section" id="10">
 <h1><a class="toc-backref" href="#10">Consts</a></h1>
 <dl class="item">
+<a id="SQLiteralVersion"></a>
+<dt><pre><a href="sqliteral.html#SQLiteralVersion"><span class="Identifier">SQLiteralVersion</span></a> <span class="Other">=</span> <span class="StringLit">&quot;1.3.0&quot;</span></pre></dt>
+<dd>
+
+
+
+</dd>
 <a id="MaxStatements"></a>
 <dt><pre><a href="sqliteral.html#MaxStatements"><span class="Identifier">MaxStatements</span></a> <span class="Other">=</span> <span class="DecNumber">100</span></pre></dt>
 <dd>
@@ -1555,28 +1565,6 @@ Creates a zero-copy view to a substring of existing string
 
 
 </dd>
-<a id="getState,SQLiteral,uint32"></a>
-<dt><pre><span class="Keyword">proc</span> <a href="#getState%2CSQLiteral%2Cuint32"><span class="Identifier">getState</span></a><span class="Other">(</span><span class="Identifier">db</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="sqliteral.html#SQLiteral"><span class="Identifier">SQLiteral</span></a><span class="Other">;</span> <span class="Identifier">partition</span><span class="Other">:</span> <span class="Identifier">uint32</span> <span class="Other">=</span> <span class="DecNumber">0</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">uint32</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma"><span class="Identifier">deprecated</span><span class="Other">:</span> <span class="StringLit">&quot;create your own state handler with setOnCommitCallback instead&quot;</span><span class="Other">,</span>
-    <span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
-<dd>
-  <div class="deprecation-message">
-    <b>Deprecated:</b> create your own state handler with setOnCommitCallback instead
-  </div>
-
-Returns a number that atomically changes on every transaction targeting the given partition. Clients can use this number to check if their local data is up-to-date or a resync is needed. Partitions use zero based-indexing, so first partition is partition 0. Maximum number of partitions is hard-coded to 100.
-
-</dd>
-<a id="changeState,SQLiteral,uint32"></a>
-<dt><pre><span class="Keyword">proc</span> <a href="#changeState%2CSQLiteral%2Cuint32"><span class="Identifier">changeState</span></a><span class="Other">(</span><span class="Identifier">db</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="sqliteral.html#SQLiteral"><span class="Identifier">SQLiteral</span></a><span class="Other">;</span> <span class="Identifier">partition</span><span class="Other">:</span> <span class="Identifier">uint32</span> <span class="Other">=</span> <span class="DecNumber">0</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">uint32</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma"><span class="Identifier">deprecated</span><span class="Other">:</span> <span class="StringLit">&quot;create your own state handler with setOnCommitCallback instead&quot;</span><span class="Other">,</span>
-    <span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
-<dd>
-  <div class="deprecation-message">
-    <b>Deprecated:</b> create your own state handler with setOnCommitCallback instead
-  </div>
-
-
-
-</dd>
 <a id="getInt,PStmt,int32"></a>
 <dt><pre><span class="Keyword">proc</span> <a href="#getInt%2CPStmt%2Cint32"><span class="Identifier">getInt</span></a><span class="Other">(</span><span class="Identifier">prepared</span><span class="Other">:</span> <span class="Identifier">PStmt</span><span class="Other">;</span> <span class="Identifier">col</span><span class="Other">:</span> <span class="Identifier">int32</span> <span class="Other">=</span> <span class="DecNumber">0</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">int64</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma"><span class="Identifier">inline</span><span class="Other">,</span> <span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
     <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
@@ -1638,7 +1626,7 @@ Prepares a cstring into an executable statement
     <span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">SQLError</span><span class="Other">,</span> <span class="Identifier">SQLError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
 <dd>
 
-<p>Dynamically prepares, executes and finalizes given query and returns value of INTEGER -type column at column index 0 of first result row.<br />If query does not return any rows, returns -2147483647 (low(int32) + 1).<br /></p>
+| Dynamically prepares, executes and finalizes given query and returns value of INTEGER -type column at column index 0 of first result row.<p>If query does not return any rows, returns -2147483647 (low(int32) + 1).<br /></p>
 
 </dd>
 <a id="getTheString,SQLiteral,,varargs[DbValue,toDb]"></a>
@@ -1654,7 +1642,7 @@ Prepares a cstring into an executable statement
     <span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">SQLError</span><span class="Other">,</span> <span class="Identifier">SQLError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
 <dd>
 
-<p>Dynamically prepares, executes and finalizes given query and returns value of TEXT -type column at column index 0 of first result row.<br />If query does not return any rows, returns empty string.<br /></p>
+| Dynamically prepares, executes and finalizes given query and returns value of TEXT -type column at column index 0 of first result row.<p>If query does not return any rows, returns empty string.<br /></p>
 
 </dd>
 <a id="getLastInsertRowid,SQLiteral"></a>
@@ -1743,7 +1731,7 @@ Returns true if given column exists in given table
 
 <p>Set callback procedure to gather all executed statements with their parameters.</p>
 <p>If code &gt; 0, log concerns sqlite error with error code in question.</p>
-<p>If code == -1, log may be of minor interest (originating from exes or statement preparation).</p>
+<p>If code == -1, log may be of minor interest (originating from <tt class="docutils literal"><span class="pre">exes</span></tt> or statement preparation).</p>
 <p>Paramtruncat parameter limits the maximum log length of parameters so that long inputs won't clutter logs. Value &lt; 1 disables truncation.</p>
 <p>You can use the same logger for multiple sqliterals, the caller is also given as parameter.</p>
 
@@ -1757,15 +1745,24 @@ Returns true if given column exists in given table
 Set callback procedure that is triggered inside transaction proc, when commit to database has been executed.
 
 </dd>
-<a id="openDatabase,SQLiteral,string,string,typedesc[],int"></a>
-<dt><pre><span class="Keyword">proc</span> <a href="#openDatabase%2CSQLiteral%2Cstring%2Cstring%2Ctypedesc%5B%5D%2Cint"><span class="Identifier">openDatabase</span></a><span class="Other">(</span><span class="Identifier">db</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="sqliteral.html#SQLiteral"><span class="Identifier">SQLiteral</span></a><span class="Other">;</span> <span class="Identifier">dbname</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span> <span class="Identifier">schema</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span>
+<a id="openDatabase,SQLiteral,string,openArray[string],typedesc[],int"></a>
+<dt><pre><span class="Keyword">proc</span> <a href="#openDatabase%2CSQLiteral%2Cstring%2CopenArray%5Bstring%5D%2Ctypedesc%5B%5D%2Cint"><span class="Identifier">openDatabase</span></a><span class="Other">(</span><span class="Identifier">db</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="sqliteral.html#SQLiteral"><span class="Identifier">SQLiteral</span></a><span class="Other">;</span> <span class="Identifier">dbname</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span> <span class="Identifier">schemas</span><span class="Other">:</span> <span class="Identifier">openArray</span><span class="Other">[</span><span class="Identifier">string</span><span class="Other">]</span><span class="Other">;</span>
                   <span class="Identifier">Statements</span><span class="Other">:</span> <span class="Identifier">typedesc</span><span class="Other">[</span><span class="Keyword">enum</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">maxKbSize</span> <span class="Other">=</span> <span class="DecNumber">0</span><span class="Other">;</span> <span class="Identifier">wal</span> <span class="Other">=</span> <span class="Identifier">true</span><span class="Other">)</span></pre></dt>
 <dd>
 
-<p>Opens an exclusive connection, boots up the database, executes given schema and prepares given statements.</p>
+<p>Opens an exclusive connection, boots up the database, executes given schemas and prepares given statements.</p>
 <p>If dbname is not a path, current working directory will be used.</p>
 <p>If wal = true, database is opened in WAL mode with NORMAL synchronous setting.<br />If wal = false, database is opened in PERSIST mode with FULL synchronous setting.<br /><a class="reference external" href="https://www.sqlite.org/wal.html">https://www.sqlite.org/wal.html</a><br /><a class="reference external" href="https://www.sqlite.org/pragma.html#pragma_synchronous">https://www.sqlite.org/pragma.html#pragma_synchronous</a><br /></p><p>If maxKbSize == 0, database size is limited only by OS or hardware with possibly severe consequences. </p>
 
+
+</dd>
+<a id="openDatabase,SQLiteral,string,string,typedesc[],int"></a>
+<dt><pre><span class="Keyword">proc</span> <a href="#openDatabase%2CSQLiteral%2Cstring%2Cstring%2Ctypedesc%5B%5D%2Cint"><span class="Identifier">openDatabase</span></a><span class="Other">(</span><span class="Identifier">db</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="sqliteral.html#SQLiteral"><span class="Identifier">SQLiteral</span></a><span class="Other">;</span> <span class="Identifier">dbname</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span> <span class="Identifier">schema</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span>
+                  <span class="Identifier">Statements</span><span class="Other">:</span> <span class="Identifier">typedesc</span><span class="Other">[</span><span class="Keyword">enum</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">maxKbSize</span> <span class="Other">=</span> <span class="DecNumber">0</span><span class="Other">;</span> <span class="Identifier">wal</span> <span class="Other">=</span> <span class="Identifier">true</span><span class="Other">)</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma">
+    <span class="Identifier">inline</span></span><span class="Other">.}</span></span></pre></dt>
+<dd>
+
+Open database with a single schema.
 
 </dd>
 <a id="setReadonly,SQLiteral,bool"></a>
@@ -1792,19 +1789,48 @@ Set callback procedure that is triggered inside transaction proc, when commit to
 <p>In addition, database read/write performance ratio may be adjusted with parameters:<br /><a class="reference external" href="https://sqlite.org/pragma.html#pragma_page_size">https://sqlite.org/pragma.html#pragma_page_size</a><br /><a class="reference external" href="https://www.sqlite.org/pragma.html#pragma_wal_checkpoint">https://www.sqlite.org/pragma.html#pragma_wal_checkpoint</a><br /></p>
 
 </dd>
+<a id="initBackup,SQLiteral,string"></a>
+<dt><pre><span class="Keyword">proc</span> <a href="#initBackup%2CSQLiteral%2Cstring"><span class="Identifier">initBackup</span></a><span class="Other">(</span><span class="Identifier">db</span><span class="Other">:</span> <a href="sqliteral.html#SQLiteral"><span class="Identifier">SQLiteral</span></a><span class="Other">;</span> <span class="Identifier">backupfilename</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">)</span><span class="Other">:</span> <span class="Keyword">tuple</span><span class="Other">[</span>
+    <span class="Identifier">backupdb</span><span class="Other">:</span> <span class="Identifier">PSqlite3</span><span class="Other">,</span> <span class="Identifier">backuphandle</span><span class="Other">:</span> <span class="Identifier">PSqlite3_Backup</span><span class="Other">]</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">SQLError</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
+<dd>
+
+<p>Initializes backup processing, returning variables to use with <tt class="docutils literal"><span class="pre">stepBackup</span></tt> proc.</p>
+<p>Note that <tt class="docutils literal"><span class="pre">close</span></tt> will fail with SQLITE_BUSY if there's an unfinished backup process going on.</p>
+
+
+</dd>
+<a id="stepBackup,SQLiteral,PSqlite3,PSqlite3_Backup"></a>
+<dt><pre><span class="Keyword">proc</span> <a href="#stepBackup%2CSQLiteral%2CPSqlite3%2CPSqlite3_Backup"><span class="Identifier">stepBackup</span></a><span class="Other">(</span><span class="Identifier">db</span><span class="Other">:</span> <a href="sqliteral.html#SQLiteral"><span class="Identifier">SQLiteral</span></a><span class="Other">;</span> <span class="Identifier">backupdb</span><span class="Other">:</span> <span class="Identifier">PSqlite3</span><span class="Other">;</span>
+                <span class="Identifier">backuphandle</span><span class="Other">:</span> <span class="Identifier">PSqlite3_Backup</span><span class="Other">;</span> <span class="Identifier">pagesperportion</span> <span class="Other">=</span> <span class="DecNumber">5</span><span class="Other">.</span><span class="Identifier">int32</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">int</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma">
+    <span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">SQLError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
+<dd>
+
+<p>Backs up a portion of the database pages (default: 5) to a destination initialized with <tt class="docutils literal"><span class="pre">initBackup</span></tt>.</p>
+<p>Returns percentage of progress; 100% means that backup has been finished.</p>
+<p>The idea <a class="reference external" href="https://sqlite.org/backup.html">(check example 2)</a> is to put the thread to sleep between portions so that other operations can proceed concurrently.</p>
+<p><strong>Example:</strong></p>
+<pre class="listing"><span class="Keyword">from</span> <span class="Identifier">os</span> <span class="Keyword">import</span> <span class="Identifier">sleep</span>
+<span class="Keyword">let</span> <span class="Punctuation">(</span><span class="Identifier">backupdb</span> <span class="Punctuation">,</span> <span class="Identifier">backuphandle</span><span class="Punctuation">)</span> <span class="Operator">=</span> <span class="Identifier">db</span><span class="Operator">.</span><span class="Identifier">initBackup</span><span class="Punctuation">(</span><span class="StringLit">&quot;./backup.db&quot;</span><span class="Punctuation">)</span>
+<span class="Keyword">var</span> <span class="Identifier">progress</span><span class="Punctuation">:</span> <span class="Identifier">int</span>
+<span class="Keyword">while</span> <span class="Identifier">progress</span> <span class="Operator">&lt;</span> <span class="DecNumber">100</span><span class="Punctuation">:</span>
+  <span class="Identifier">sleep</span><span class="Punctuation">(</span><span class="DecNumber">250</span><span class="Punctuation">)</span>
+  <span class="Identifier">progress</span> <span class="Operator">=</span> <span class="Identifier">db</span><span class="Operator">.</span><span class="Identifier">stepBackup</span><span class="Punctuation">(</span><span class="Identifier">backupdb</span><span class="Punctuation">,</span> <span class="Identifier">backuphandle</span><span class="Punctuation">)</span></pre>
+
+</dd>
 <a id="about,SQLiteral"></a>
 <dt><pre><span class="Keyword">proc</span> <a href="#about%2CSQLiteral"><span class="Identifier">about</span></a><span class="Other">(</span><span class="Identifier">db</span><span class="Other">:</span> <a href="sqliteral.html#SQLiteral"><span class="Identifier">SQLiteral</span></a><span class="Other">)</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">SQLError</span><span class="Other">,</span> <span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">OSError</span><span class="Other">]</span><span class="Other">,</span>
                             <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">,</span> <span class="Identifier">ReadIOEffect</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
 <dd>
 
-Echoes some info about the database
+Echoes some info about the database.
 
 </dd>
 <a id="close,SQLiteral"></a>
 <dt><pre><span class="Keyword">proc</span> <a href="#close%2CSQLiteral"><span class="Identifier">close</span></a><span class="Other">(</span><span class="Identifier">db</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="sqliteral.html#SQLiteral"><span class="Identifier">SQLiteral</span></a><span class="Other">)</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
 <dd>
 
-Closes the database
+Closes the database.
 
 </dd>
 
@@ -1904,7 +1930,7 @@ Executes body with all transactions disabled.
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br/>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2020-11-23 13:07:25 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2021-02-19 16:31:08 UTC</small>
       </div>
     </div>
   </div>
