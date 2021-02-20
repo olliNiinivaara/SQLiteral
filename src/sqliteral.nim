@@ -1,6 +1,6 @@
-const SQLiteralVersion* = "1.3.0"
+const SQLiteralVersion* = "1.3.1"
 
-# (C) Olli Niinivaara, 2020
+# (C) Olli Niinivaara, 2020-2021
 # MIT Licensed
 
 ## A high level SQLite API with support for multi-threading, prepared statements,
@@ -92,7 +92,7 @@ import sqlite3
 export PStmt, errmsg, reset, step, finalize, SQLITE_ROW
 import Locks
 from os import getFileSize
-from strutils import strip, split, replace # Sic
+from strutils import strip, split, contains, replace
 
 const
   MaxStatements* {.intdefine.} = 100
@@ -565,10 +565,11 @@ proc columnExists*(db: SQLiteral, table: string, column: string): bool =
     discard pstmt.finalize()
   
 
-template transaction*(db: var SQLiteral, statepartition: uint32, body: untyped) =
-  ## statepartition handling is being deprecated; create your own state handler with setOnCommitCallback instead 
+template transaction*(db: var SQLiteral, body: untyped) =
+  ## | Every write to database must happen inside some transaction.
+  ## | Groups of reads must be wrapped in same transaction if mutual consistency required.
+  ## | In WAL mode (the default), independent reads must NOT be wrapped in transaction to allow parallel processing.
   if not db.inreadonlymode:
-    assert(statepartition < 100, "statepartition out of bounds")
     acquire(db.transactionlock)
     db.exec(db.Transaction)
     db.intransaction = true
@@ -588,15 +589,8 @@ template transaction*(db: var SQLiteral, statepartition: uint32, body: untyped) 
       release(db.transactionlock)
 
 
-template transaction*(db: SQLiteral, body: untyped) =
-  ## | Every write to database must happen inside some transaction.
-  ## | Groups of reads must be wrapped in same transaction if mutual consistency required.
-  ## | In WAL mode (the default), independent reads must NOT be wrapped in transaction to allow parallel processing.
-  transaction(db, 0, body)
-
-
 template transactionsDisabled*(db: var SQLiteral, body: untyped) =
-  ## Executes body with all transactions disabled.
+  ## Executes body with transactions locked (no transaction can proceed).
   acquire(db.transactionlock)
   if(unlikely) db.loggerproc != nil: db.loggerproc(db, "--- TRANSACTIONS DISABLED", 0)
   try:
@@ -641,7 +635,7 @@ proc setOnCommitCallback*(db: var SQLiteral, oncommit: proc(sqliteral: SQLiteral
 
 
 proc openDatabase*(db: var SQLiteral, dbname: string, schemas: openArray[string],
- Statements: typedesc[enum], maxKbSize = 0, wal = true) =
+ Statements: typedesc[enum], maxKbSize = 0, wal = true, ignorecolumnduplicates = true) =
   ## Opens an exclusive connection, boots up the database, executes given schemas and prepares given statements.
   ## 
   ## If dbname is not a path, current working directory will be used.
@@ -671,7 +665,11 @@ proc openDatabase*(db: var SQLiteral, dbname: string, schemas: openArray[string]
     db.maxsize = maxKbSize
     let pagesize = db.getTheInt("PRAGMA page_size")
     db.exes("PRAGMA max_page_count = " & $(maxKbSize * 1024 div pagesize))
-  for schema in schemas: db.exes(schema)
+  for schema in schemas:
+    try: db.exes(schema)
+    except:
+      echo getCurrentExceptionMsg()
+      if not (ignorecolumnduplicates and getCurrentExceptionMsg().contains("duplicate column name")): raise
   db.Transaction = db.prepareSql("BEGIN IMMEDIATE".cstring)
   db.Commit = db.prepareSql("COMMIT".cstring)
   db.Rollback = db.prepareSql("ROLLBACK".cstring)
@@ -681,9 +679,9 @@ proc openDatabase*(db: var SQLiteral, dbname: string, schemas: openArray[string]
   
 
 proc openDatabase*(db: var SQLiteral, dbname: string, schema: string,
- Statements: typedesc[enum], maxKbSize = 0, wal = true) {.inline.} =
+ Statements: typedesc[enum], maxKbSize = 0, wal = true, ignorecolumnduplicates = true) {.inline.} =
   ## Open database with a single schema.
-  openDatabase(db, dbname, [schema], Statements, maxKbSize, wal)
+  openDatabase(db, dbname, [schema], Statements, maxKbSize, wal, ignorecolumnduplicates)
   
 
 proc setReadonly*(db: var SQLiteral, readonly: bool) =

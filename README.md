@@ -22,3 +22,26 @@ http://htmlpreview.github.io/?https://github.com/olliNiinivaara/SQLiteral/blob/m
 **1.4.0** https://www.sqlite.org/json1.html
 
 **2.0.0** When views become officially supported in nim, remove Text
+
+## Example
+
+```nim
+import sqliteral
+const Schema = """
+  CREATE TABLE IF NOT EXISTS Example(count INTEGER NOT NULL);
+  INSERT INTO Example(rowid, count) VALUES(1, 1) ON CONFLICT(rowid) DO UPDATE SET count=count+100
+  """
+type SqlStatements = enum
+  Increment = "UPDATE Example SET count=count+1 WHERE rowid = ?"
+  Select = "SELECT count FROM Example WHERE rowid = ?"
+var db: SQLiteral
+
+when not defined(release):
+  db.setLogger(proc(db: SQLiteral, msg: string, code: int) = echo code," ",msg)
+
+db.openDatabase("example.db", Schema, SqlStatements)
+echo "count=",db.getTheInt(Select, 1) 
+db.transaction: db.exec(Increment, 1)
+echo "count=",db.getTheInt(Select, 1)
+db.close
+```
