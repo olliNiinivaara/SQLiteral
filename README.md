@@ -31,9 +31,11 @@ const Schema = """
   CREATE TABLE IF NOT EXISTS Example(count INTEGER NOT NULL);
   INSERT INTO Example(rowid, count) VALUES(1, 1) ON CONFLICT(rowid) DO UPDATE SET count=count+100
   """
+const CountColumn = 0
 type SqlStatements = enum
   Increment = "UPDATE Example SET count=count+1 WHERE rowid = ?"
   Select = "SELECT count FROM Example WHERE rowid = ?"
+  SelectAll = "SELECT count FROM Example"
 var db: SQLiteral
 
 when not defined(release):
@@ -42,6 +44,6 @@ when not defined(release):
 db.openDatabase("example.db", Schema, SqlStatements)
 echo "count=",db.getTheInt(Select, 1) 
 db.transaction: db.exec(Increment, 1)
-echo "count=",db.getTheInt(Select, 1)
+for row in db.rows(SelectAll): echo row.getInt(CountColumn)
 db.close
 ```
