@@ -39,7 +39,7 @@ type SqlStatements = enum
 var db: SQLiteral
 
 when not defined(release):
-  db.setLogger(proc(db: SQLiteral, msg: string, code: int) = echo code," ",msg)
+  db.setLogger(proc(db: SQLiteral, msg: string, code: int) = echo msg)
 
 db.openDatabase("example.db", Schema, SqlStatements)
 echo "count=",db.getTheInt(Select, 1) 
