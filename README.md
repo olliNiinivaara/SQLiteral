@@ -6,11 +6,14 @@ zero-copy data paths, debugging, JSON, optimizing, backups, and more...
 
 ## Documentation
 [1.3.0](http://htmlpreview.github.io/?https://github.com/olliNiinivaara/SQLiteral/blob/master/doc/sqliteral130.html)
+
 [2.0.0](http://htmlpreview.github.io/?https://github.com/olliNiinivaara/SQLiteral/blob/master/doc/sqliteral200.html)
 
 
 ## Installation
-`nimble install sqliteral`
+1.3.0: `nimble install sqliteral`
+
+2.0.0: `nimble install sqliteral@#head`
 
 ## Change log
 
@@ -21,7 +24,7 @@ zero-copy data paths, debugging, JSON, optimizing, backups, and more...
 
 **2.0.0 pre-release (2021-02-24) current master**
 * thread-local isolated data structures make all interferences between threads impossible
-* better support for experimental:view -based zero-copy strings
+* better support for experimental:views -based zero-copy strings
 * JSON helper functions, JSON in documentation example
 * breaking API change: New prepareStatements() proc must be used
 
@@ -31,7 +34,8 @@ zero-copy data paths, debugging, JSON, optimizing, backups, and more...
 import sqliteral
 const Schema = """
   CREATE TABLE IF NOT EXISTS Example(count INTEGER NOT NULL);
-  INSERT INTO Example(rowid, count) VALUES(1, 1) ON CONFLICT(rowid) DO UPDATE SET count=count+100
+  INSERT INTO Example(rowid, count) VALUES(1, 1)
+   ON CONFLICT(rowid) DO UPDATE SET count=count+100
   """
 const CountColumn = 0
 type SqlStatements = enum
