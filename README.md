@@ -1,29 +1,31 @@
 # SQLiteral
 A high level SQLite API for Nim
 
-Supports multi-threading, prepared statements, proper typing, zero-copy string views,
-debugging executed statements, static binding to sqlite3.c of your choice, optimizing, backups, and more...
+Supports multi-threading, prepared statements, proper typing, 
+zero-copy data paths, debugging, JSON, optimizing, backups, and more...
 
 ## Documentation
-http://htmlpreview.github.io/?https://github.com/olliNiinivaara/SQLiteral/blob/master/doc/sqliteral.html
+[1.3.0](http://htmlpreview.github.io/?https://github.com/olliNiinivaara/SQLiteral/blob/master/doc/sqliteral130.html)
+[2.0.0](http://htmlpreview.github.io/?https://github.com/olliNiinivaara/SQLiteral/blob/master/doc/sqliteral200.html)
+
 
 ## Installation
 `nimble install sqliteral`
 
 ## Change log
 
-**1.3.0 (2021-02-19)**
-* take backup concurrently
+**1.3.0 (2021-02-19) current release**
+* take backups concurrently
 * database open supports multiple schemas
 * partition states removed
 
-## Roadmap
+**2.0.0 pre-release (2021-02-24) current master**
+* thread-local isolated data structures make all interferences between threads impossible
+* better support for experimental:view -based zero-copy strings
+* JSON helper functions, JSON in documentation example
+* breaking API change: New prepareStatements() proc must be used
 
-**1.4.0** https://www.sqlite.org/json1.html
-
-**2.0.0** When views become officially supported in nim, remove Text
-
-## Example
+## Example (version 2.0.0)
 
 ```nim
 import sqliteral
@@ -41,7 +43,8 @@ var db: SQLiteral
 when not defined(release):
   db.setLogger(proc(db: SQLiteral, msg: string, code: int) = echo msg)
 
-db.openDatabase("example.db", Schema, SqlStatements)
+db.openDatabase("example.db", Schema)
+db.prepareStatements(SqlStatements)
 echo "count=",db.getTheInt(Select, 1) 
 db.transaction: db.exec(Increment, 1)
 for row in db.rows(SelectAll): echo row.getInt(CountColumn)

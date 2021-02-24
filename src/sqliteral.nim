@@ -1,108 +1,117 @@
-const SQLiteralVersion* = "1.3.1"
+const SQLiteralVersion* = "2.0.0"
 
 # (C) Olli Niinivaara, 2020-2021
 # MIT Licensed
 
 ## A high level SQLite API with support for multi-threading, prepared statements,
-## proper typing, zero-copy string views, debugging executed statements,
-## static binding to sqlite3.c of your choice, optimizing, backups, and more.
+## proper typing, zero-copy data paths, debugging, json, optimizing, backups, and more.
 ## 
-## A Complete Example
+## Example
 ## ==================
 ##
 ## .. code-block:: Nim
-## 
-##  import sqliteral
 ##  
-##  const
-##    Schema = "CREATE TABLE IF NOT EXISTS Example(data TEXT NOT NULL)"
+##  # nim c --threads:on example
+##  #(works if sqlite compiled with json extensions)
+##  
+##  # nim c -d:danger --gc:orc -d:staticSqlite --experimental:views --threads:on example
+##  # (works if sqlite3.c in path)
+##  
+##  import sqliteral, threadpool
+##  from strutils import find
+##  from os import sleep
+##   
+##  const Schema = "CREATE TABLE IF NOT EXISTS Example(name TEXT NOT NULL, jsondata TEXT NOT NULL)"
 ##  
 ##  type SqlStatements = enum
-##    Insert = "INSERT INTO Example (data) VALUES (?)"
-##    Update = "UPDATE Example SET data = ? WHERE rowid = ?"
-##    Select = "SELECT data FROM Example WHERE rowid = ?"
-##    SelectAll = "SELECT rowid, data FROM Example"
-##    Delete = "DELETE FROM Example WHERE rowid = ?"
+##    Insert = """INSERT INTO Example (name, jsondata)
+##     VALUES (json_extract(?, '$.name'), json_extract(?, '$.data'))"""
+##    Count = "SELECT count(*) FROM Example"
+##    Select = "SELECT json_extract(jsondata, '$.array') FROM Example"
 ##  
-##  const
-##    Rowid = 0
-##    Data = 1
+##  let httprequest = """header BODY:{"name":"Alice", "data":{"info":"xxx", "array":["a","b","c"]}}"""
 ##  
-##  var db: SQLiteral
-##  var state: int
+##  var 
+##    db: SQLiteral
+##    prepared {.threadvar.}: bool
+##    ready: int
 ##  
+##  when not defined(release): db.setLogger(proc(db: SQLiteral, msg: string, code: int) = echo msg)
 ##  
-##  proc operate() =
+##  proc select() =
 ##    {.gcsafe.}:
-##      echo "startstate: ", state
-##      
-##      for i in 0 .. 9:
-##        db.transaction:
-##          let newrowid = db.insert(Insert, "dada")
-##          let value = db.getTheString(Select, newrowid)
-##          let updatedvalue = value & " " & $newrowid
-##          db.exec(Update, updatedvalue, newrowid)
-##          echo "+ ", updatedvalue
-##      
-##      for row in db.rows(SelectAll): echo row.getString(Data)
-##      
+##      if not prepared: db.prepareStatements(SqlStatements)
+##      for row in db.rows(Select): stdout.write($row.getString(0) & '\n')
+##      discard ready.atomicInc
+##  
+##  proc run() =
+##    db.openDatabase("example.db", Schema)
+##    defer: db.close()
+##    db.prepareStatements(SqlStatements)
+##    if db.getTheInt(Count) < 1:
+##      let body = asText(httprequest, httprequest.find("BODY:") + 5, httprequest.len - 1)
+##      if not db.json_valid(body): quit(0)
+##      echo "inserting 10000 rows..."
 ##      db.transaction:
-##        for row in db.rows(SelectAll):
-##          let rowid = row.getInt(Rowid)
-##          if rowid mod 3 == 0:
-##            db.exec(Delete, rowid)
-##            echo "- ", row.getString(Data)
-##      
-##      echo "endstate: ", state
+##        for i in 1 .. 10000: discard db.insert(Insert, body, body)
+##    else:
+##      for i in 1 .. 4: spawn(select())
+##      while (ready < 4): sleep(20)
+##      stdout.flushFile()
+##      echo "Selected 4 * ", db.getTheInt(Count), " rows"
 ##  
+##  run()
 ##  
-##  when not defined(release):
-##    proc logSql(db: SQLiteral, msg: string, code: int) = echo code," ",msg
-##    db.setLogger(logSql)
-##  
-##  db.openDatabase("testdatabase", Schema, SqlStatements)
-##  db.about()
-##  db.setOnCommitCallback(proc (db: SQLiteral) = state.atomicInc)
-##  var threads: array[5, Thread[void]]
-##  for i in 0 .. threads.high: createThread(threads[i], operate)
-##  joinThreads(threads)
-##  db.optimize()
-##  db.close()
 ##
-## Compiling
-## =========
+## Compiling with sqlite3.c
+## ========================
 ## 
-## sqlite3.c amalgamation must be on compiler search path, get yours from
-## https://www.sqlite.org/download.html.
+## | First, sqlite3.c amalgamation must be on compiler search path.
+## | You can extract it from a zip available at https://www.sqlite.org/download.html.
+## | Then, `-d:staticSqlite`compiler option must be used.
 ## 
-## Compile command must define: `-d:staticSqlite`
+## For your convenience, `-d:staticSqlite` triggers some useful SQLite compiler options,
+## consult sqliteral source code or `about()` proc for details.
+## These can be turned off with `-d:disableSqliteoptions` option.
 ## 
-## An example: `nim c -r --experimental:views --threads:on -d:staticSqlite myprogram`
 ## 
-## See also
-## ========
-## 
-## | `sqlite <https://nim-lang.org/docs/db_sqlite.html>`_
-## | `tiny_sqlite <https://gulpf.github.io/tiny_sqlite/tiny_sqlite.html>`_
-##
 
-{.passL: "-lpthread".}
+when compiles((var x = 1; var vx: var int = x)):
+  const ViewsAvailable = true
+else:
+  const ViewsAvailable = false
+
+when defined(staticSqlite):
+  when compileOption("threads"): {.passL: "-lpthread".}
+  else: {.passC: "-DSQLITE_THREADSAFE=0".}
+
+when not defined(disableSqliteoptions):
+  {.passC: "-DSQLITE_DQS=0 -DSQLITE_OMIT_DEPRECATED -DSQLITE_OMIT_SHARED_CACHE -DSQLITE_LIKE_DOESNT_MATCH_BLOBS".}
+  {.passC: "-DSQLITE_ENABLE_JSON1 -DSQLITE_DEFAULT_MEMSTATUS=0 -DSQLITE_OMIT_PROGRESS_CALLBACK".}
+  when defined(danger):
+    {.passC: "-DSQLITE_USE_ALLOCA -DSQLITE_MAX_EXPR_DEPTH=0".}
 
 import sqlite3
 export PStmt, errmsg, reset, step, finalize, SQLITE_ROW
-import Locks
+import locks
 from os import getFileSize
 from strutils import strip, split, contains, replace
 
 const
+  MaxThreadSize* {.intdefine.} = 32
   MaxStatements* {.intdefine.} = 100
     ## Compile time define pragma that limits amount of prepared statements
   
-
 type
-  SQLError* = object of CatchableError
+  SQLError* = ref object of CatchableError
     ## https://www.sqlite.org/rescode.html
     rescode*: int
+  
+  InternalStatements = enum
+    Jsonextract = "SELECT json_extract(?,?)"
+    Jsonpatch = "SELECT json_patch(?,?)"
+    Jsonvalid = "SELECT json_valid(?)"
+    Jsontree = "SELECT type, fullkey, value FROM json_tree(?)"
 
   SQLiteral* = object
     sqlite*: PSqlite3
@@ -110,10 +119,13 @@ type
     inreadonlymode*: bool
     intransaction: bool
     walmode: bool 
-    maxsize: int    
-    transactionlock: Lock
-    preparedstatements: array[MaxStatements, PStmt]
+    maxsize: int
+    threadindices: array[MaxThreadSize, int]
+    threadlen: int
+    preparedstatements: array[MaxThreadSize, array[MaxStatements, PStmt]]
     laststatementindex: int
+    internalstatements: array[MaxThreadSize, array[ord(Jsontree)+1, PStmt]]
+    transactionlock: Lock
     loggerproc: proc(sqliteral: SQLiteral, statement: string, errorcode: int) {.gcsafe, raises: [].}
     oncommitproc: proc(sqliteral: SQLiteral) {.gcsafe, raises: [].}
     maxparamloggedlen: int
@@ -121,14 +133,29 @@ type
     Commit: PStmt
     Rollback: PStmt
 
-type
   DbValueKind = enum
     sqliteInteger,
     sqliteReal,
-    sqliteText,
+    sqliteTextview,
+    sqliteTextuncheckedarray,
     sqliteBlob
-
-when compiles(var x = toOpenArray("x", 0, 0)):
+  
+  Text* = tuple[data: ptr UncheckedArray[char], len: int32]
+    ## To avoid copying strings, SQLiteral offers Text as a zero-copy view to a slice of existing string
+    ##
+    ## Compile with --experimental:views to use the new language-supported zero-copy views instead (when they work).
+    ## Text will be removed when views become officially supported in Nim...
+    ## 
+    ## **Example:**
+    ##
+    ## .. code-block:: Nim
+    ##
+    ##    var buffer = """{"sentence": "Call me Ishmael"}"""
+    ##    let value = asText(buffer, buffer.find(" \"")+2, buffer.find("\"}")-1)
+    ##    assert value.equals("Call me Ishmael")
+    ##    db.exec(Update, value, rowid)
+    
+when ViewsAvailable:
   type
     DbValue* = object
       ## | Represents a value in a SQLite database.
@@ -139,10 +166,14 @@ when compiles(var x = toOpenArray("x", 0, 0)):
         intVal*: int64
       of sqliteReal:
         floatVal*: float64
-      of sqliteText:
+      of sqliteTextview:
         textVal*: openArray[char]
+      of sqliteTextuncheckedarray:
+        uncheckedarraytextVal*: Text
+          ## --experimental:views also offers openArray[char].
+          ## (nimdoc does not support documenting these experimental features)
       of sqliteBlob:
-        blobVal*: seq[byte]
+        blobVal*: seq[byte] # TODO: openArray[byte]
 else:
   type
     DbValue* = object
@@ -154,105 +185,113 @@ else:
         intVal*: int64
       of sqliteReal:
         floatVal*: float64
-      of sqliteText:
-        deprecatedtextVal*: Text
-          ## use --experimental:views compile flag to use openArray[char] instead.
-          ## (unfortunately nimdoc does not support the feature.)
+      of sqliteTextview:
+        textVal*: bool # not in use!
+      of sqliteTextuncheckedarray:
+        uncheckedarraytextVal*: Text
       of sqliteBlob:
         blobVal*: seq[byte]
 
-    # Text ----------------------------------------------------
+#----------------------------------------------------------
 
-    Text* = tuple[data: ptr UncheckedArray[char], len: int32]
-      ## Compile with --experimental:views to get proper language-supported zero-copy
-      ## views to slices of existing strings.
-      ## Current hack is deprecated and will be removed when views become official...
-      ## 
-      ## To avoid copying strings, SQLiteral offers Text as a zero-copy view to a slice of existing string
-      ## 
-      ## **Example:**
-      ##
-      ## .. code-block:: Nim
-      ##
-      ##    var buffer = """{"sentence": "Call me Ishmael"}"""
-      ##    let value = asText(buffer, buffer.find(" \"")+2, buffer.find("\"}")-1)
-      ##    assert value.equals("Call me Ishmael")
-      ##    db.exec(Update, value, rowid)
+proc asText*(fromstring: string, first: int, last: int): Text =
+  ## Creates a zero-copy view to a substring of existing string
+  doAssert(last < fromstring.len)
+  doAssert(last < int32.high)
+  (cast[ptr UncheckedArray[char]](fromstring[first].unsafeAddr), (last - first + 1).int32)
 
-  var emptytext = "X"
-  var emptystart = cast[ptr UncheckedArray[char]](addr emptytext[0])
+proc asText*(fromstring: ptr string, first: int, last: int): Text =
+  ## Creates a zero-copy view to a substring of existing string
+  doAssert(first < fromstring[].len)
+  doAssert(last < fromstring[].len)
+  doAssert(last < int32.high)
+  (cast[ptr UncheckedArray[char]](fromstring[first].unsafeAddr), (last - first + 1).int32)
 
-  proc asText*(fromstring: string, start: int, last: int): Text {.deprecated.} =
-    ## Creates a zero-copy view to a substring of existing string
-    doAssert(last < fromstring.len)
-    doAssert(last < int32.high)
-    (cast[ptr UncheckedArray[char]](fromstring[start].unsafeAddr), (last - start + 1).int32)
+proc equals*(text: Text, str: string): bool {.inline.} =
+  if text.len != str.len: return false
+  for i in 0 ..< text.len:
+    if text.data[i] != str[i]: return false
+  return true
 
-  proc equals*(text: Text, str: string): bool {.inline, deprecated.} =
-    if text.len != str.len: return false
-    for i in 0 ..< text.len:
-      if text.data[i] != str[i]: return false
-    return true
+proc `$`*(text: Text): string =
+  for i in 0 ..< text.len: result.add(text.data[i])
 
-  proc `$`*(text: Text): string =
-    for i in 0 ..< text.len: result.add(text.data[i])
+proc len*(text: Text): int {.inline.} = text.len
 
-  proc len*(text: Text): int {.inline, deprecated.} = text.len
+proc substr*(text: Text, start: int, last: int): string =
+  for i in start ..< last: result.add(text.data[i])
 
-  proc substr*(text: Text, start: int, last: int): string {.deprecated.} =
-    for i in start ..< last: result.add(text.data[i])
+var emptytext = "X"
+var emptystart = cast[ptr UncheckedArray[char]](addr emptytext[0])
 
-  # ----------------------------------------------------------
+#----------------------------------------------------------
+
+when compileOption("threads"):
+  proc threadi(db: SQLiteral): int {.inline.} =
+    let id = getThreadId()
+    for i in 0 ..< db.threadlen: (if db.threadindices[i] == id: return i)
+    doAssert(false)
+else:
+  template threadi(db: SQLiteral): int = 0
 
 
 template checkRc*(db: SQLiteral, resultcode: int) =
-  ## Raises SQLError if resultcode notin [SQLITE_OK, SQLITE_ROW, SQLITE_DONE]
-  ## https://www.sqlite.org/rescode.html
+  ## | Raises SQLError if resultcode notin [SQLITE_OK, SQLITE_ROW, SQLITE_DONE]
+  ## | https://www.sqlite.org/rescode.html
   if resultcode notin [SQLITE_OK, SQLITE_ROW, SQLITE_DONE]:
-    let errormsg = $db.sqlite.errmsg()
+    let errormsg = $errmsg(db.sqlite)
     if(unlikely) db.loggerproc != nil: db.loggerproc(db, errormsg, resultcode)
-    raise (ref SQLError)(msg: db.dbname & " " & errormsg, rescode: resultcode)
+    raise SQLError(msg: db.dbname & " " & errormsg, rescode: resultcode)
 
+
+when ViewsAvailable:
+  proc toDb*(val: string): DbValue {.inline.} =
+    DbValue(kind: sqliteTextview, textVal: toOpenArray(val, 0, val.high))
+  
+  proc toDb*(val: openArray[char]): DbValue {.inline.} =
+    #DbValue(kind: sqliteText, textVal: val)
+    # nim error: incompatible types when assigning to type ‘tyOpenArray__g7UvpSI7wiag75QHJKQ1sQ’ {aka ‘struct <anonymous>’} from type ‘NIM_CHAR *’ {aka ‘char *’}
+    DbValue(kind: sqliteTextuncheckedarray, uncheckedarraytextVal: (cast[ptr UncheckedArray[char]](val[0].unsafeAddr), val.len.int32))
+else:
+  proc toDb*(val: string): DbValue {.inline.} =
+    if val.len == 0:
+      DbValue(kind: sqliteTextuncheckedarray, uncheckedarraytextVal: (emptystart , 0.int32))
+    else:
+      DbValue(kind: sqliteTextuncheckedarray, uncheckedarraytextVal: (cast[ptr UncheckedArray[char]](val[0].unsafeAddr), val.len.int32))
+
+
+proc toDb*(val: Text): DbValue {.inline.} =
+  if val[1] < 0 or val[1] > high(int32):  raise SQLError(msg: "Text weird len: " & $val[1])
+  DbValue(kind: sqliteTextuncheckedarray, uncheckedarraytextVal: val)
 
 proc toDb*[T: Ordinal](val: T): DbValue {.inline.} = DbValue(kind: sqliteInteger, intVal: val.int64)
 
 proc toDb*[T: SomeFloat](val: T): DbValue {.inline.} = DbValue(kind: sqliteReal, floatVal: val.float64)
 
-when compiles(var x = toOpenArray("x", 0, 0)):
-  proc toDb*[T: string](val: T): DbValue {.inline.} =
-    DbValue(kind: sqliteText, textVal: toOpenArray(val, 0, val.high))
-else:
-  proc toDb*[T: string](val: T): DbValue {.inline.} =
-    if val.len == 0:
-      DbValue(kind: sqliteText, deprecatedtextVal: (emptystart , 0.int32))
-    else:
-      DbValue(kind: sqliteText, deprecatedtextVal: (cast[ptr UncheckedArray[char]](val[0].unsafeAddr) , val.len.int32))
-
-  proc toDb*[T: Text](val: T): DbValue {.inline.} =
-    if val[1] < 0 or val[1] > high(int32):  raise (ref SQLError)(msg: "Text weird len: " & $val[1])
-    DbValue(kind: sqliteText, textVal: val)
-
-proc toDb*[T: seq[byte]](val: T): DbValue {.inline.} = DbValue(kind: sqliteBlob, blobVal: val) # TODO: test
+proc toDb*(val: seq[byte]): DbValue {.inline.} = DbValue(kind: sqliteBlob, blobVal: val)
   
 proc toDb*[T: DbValue](val: T): DbValue {.inline.} = val
 
-when compiles(var x = toOpenArray("x", "0", 0)):
+
+when ViewsAvailable:
   proc `$`*[T: DbValue](val: T): string {.inline.} = 
     case val.kind
     of sqliteInteger: $val.intval
     of sqliteReal: $val.floatVal
-    of sqliteText: $val.textVal
+    of sqliteTextview: $val.textVal
+    of sqliteTextuncheckedarray: $val.uncheckedarraytextVal
     of sqliteBlob: cast[string](val.blobVal)
 else:
   proc `$`*[T: DbValue](val: T): string {.inline.} = 
     case val.kind
     of sqliteInteger: $val.intval
     of sqliteReal: $val.floatVal
-    of sqliteText: $val.deprecatedtextVal
+    of sqliteTextview: "{.fatal: not available}"
+    of sqliteTextuncheckedarray: $val.uncheckedarraytextVal
     of sqliteBlob: cast[string](val.blobVal)
 
 
-when compiles(var x = toOpenArray("x", "0", 0)):
+when ViewsAvailable:
   proc bindParams*(sql: PStmt, params: varargs[DbValue]): int {.inline.} =
     var idx = 1.int32
     for value in params:
@@ -260,9 +299,10 @@ when compiles(var x = toOpenArray("x", "0", 0)):
         case value.kind
         of sqliteInteger: bind_int64(sql, idx, value.intval)
         of sqliteReal: bind_double(sql, idx, value.floatVal)
-        of sqliteText: bind_text(sql, idx, cstring(unsafeAddr value.textVal[0]), value.textVal.len().int32, SQLITE_STATIC)
+        of sqliteTextview: bind_text(sql, idx, cstring(unsafeAddr value.textVal[0]), value.textVal.len().int32, SQLITE_STATIC)
+        of sqliteTextuncheckedarray: bind_text(sql, idx, value.uncheckedarraytextVal[0], value.uncheckedarraytextVal[1].int32, SQLITE_STATIC)
         of sqliteBlob: bind_blob(sql, idx.int32, cast[string](value.blobVal).cstring,
-         value.blobVal.len.int32 , SQLITE_STATIC) # TODO: test
+         value.blobVal.len.int32 , SQLITE_STATIC)
       if result != SQLITE_OK: return
       idx.inc
 else:
@@ -273,9 +313,10 @@ else:
         case value.kind
         of sqliteInteger: bind_int64(sql, idx, value.intval)
         of sqliteReal: bind_double(sql, idx, value.floatVal)
-        of sqliteText: bind_text(sql, idx, value.deprecatedtextVal[0], value.deprecatedtextVal[1].int32, SQLITE_STATIC)
+        of sqliteTextview: -1 #{.fatal: "not available"}
+        of sqliteTextuncheckedarray: bind_text(sql, idx, value.uncheckedarraytextVal[0], value.uncheckedarraytextVal[1].int32, SQLITE_STATIC)
         of sqliteBlob: bind_blob(sql, idx.int32, cast[string](value.blobVal).cstring,
-         value.blobVal.len.int32 , SQLITE_STATIC) # TODO: test
+         value.blobVal.len.int32 , SQLITE_STATIC)
       if result != SQLITE_OK: return
       idx.inc
 
@@ -297,7 +338,8 @@ template log() =
 proc doLog*(db: SQLiteral, statement: string, params: varargs[DbValue, toDb]) {.inline.} =
   if statement == "Pstmt rows" or statement == "exec Pstmt": db.loggerproc(db, statement & " " & $params, 0)
   else: log()
- 
+
+#----------------------------------------------------------------------------------------------------------- 
 
 proc getInt*(prepared: PStmt, col: int32 = 0): int64 {.inline.} =
   ## Returns value of INTEGER -type column at given column index
@@ -311,7 +353,7 @@ proc getString*(prepared: PStmt, col: int32 = 0): string {.inline.} =
 
 proc getCString*(prepared: PStmt, col: int32 = 0): cstring {.inline.} =
   ## | Returns value of TEXT -type column at given column index as cstring.
-  ## | The result is not available after cursor movement or statement reset.
+  ## | Zero-copy, but result is not available after cursor movement or statement reset.
   return column_text(prepared, col)
 
 
@@ -331,7 +373,7 @@ proc getSeq*(prepared: PStmt, col: int32 = 0): seq[byte] {.inline.} =
 iterator rows*(db: SQLiteral, statement: enum, params: varargs[DbValue, toDb]): PStmt =
   ## Iterates over the query results
   if(unlikely) db.loggerproc != nil: log()
-  let s = db.preparedstatements[ord(statement)]
+  let s = db.preparedstatements[db.threadi][ord(statement)]
   checkRc(db, bindParams(s, params))
   defer: discard sqlite3.reset(s)
   while step(s) == SQLITE_ROW: yield s
@@ -358,7 +400,7 @@ proc getTheInt*(db: SQLiteral, statement: enum, params: varargs[DbValue, toDb]):
   ## | If query does not return any rows, returns -2147483647 (low(int32) + 1).
   ## | Automatically resets the statement.
   if(unlikely) db.loggerproc != nil: log()
-  let s = db.preparedstatements[ord(statement)]
+  let s = db.preparedstatements[db.threadi][ord(statement)]
   checkRc(db, bindParams(s, params))
   defer: discard sqlite3.reset(s)
   if step(s) == SQLITE_ROW: s.getInt(0) else: -2147483647
@@ -368,6 +410,7 @@ proc getTheInt*(db: SQLiteral, s: string): int64 {.inline.} =
   ## | Dynamically prepares, executes and finalizes given query and returns value of INTEGER -type
   ## column at column index 0 of first result row.
   ## | If query does not return any rows, returns -2147483647 (low(int32) + 1).
+  ## | For security and performance reasons, this proc should be used with caution.
   if(unlikely) db.loggerproc != nil: db.loggerproc(db, s, 0)
   let query = db.prepareSql(s)
   try:
@@ -383,16 +426,18 @@ proc getTheString*(db: SQLiteral, statement: enum, params: varargs[DbValue, toDb
   ## | If query does not return any rows, returns empty string.
   ## | Automatically resets the statement.
   if(unlikely) db.loggerproc != nil: log()
-  let s = db.preparedstatements[ord(statement)]
+  let i = db.threadi
+  let s = db.preparedstatements[db.threadi][ord(statement)]
   checkRc(db, bindParams(s, params))
   defer: discard sqlite3.reset(s)
-  if step(s) == SQLITE_ROW: s.getString(0) else: ""
+  if step(s) == SQLITE_ROW: return s.getString(0)
 
 
 proc getTheString*(db: SQLiteral, s: string): string {.inline.} =
   ## | Dynamically prepares, executes and finalizes given query and returns value of TEXT -type
   ## column at column index 0 of first result row.
   ## | If query does not return any rows, returns empty string.
+  ## | For security and performance reasons, this proc should be used with caution.
   if(unlikely) db.loggerproc != nil: db.loggerproc(db, s, 0)
   let query = db.prepareSql(s)
   try:
@@ -411,14 +456,15 @@ proc getLastInsertRowid*(db: SQLiteral): int64 {.inline.} =
 proc rowExists*(db: SQLiteral, statement: enum, params: varargs[DbValue, toDb]): bool {.inline.} =
   ## Returns true if query returns any rows
   if(unlikely) db.loggerproc != nil: log()
-  let s = db.preparedstatements[ord(statement)]
+  let s = db.preparedstatements[db.threadi][ord(statement)]
   checkRc(db, bindParams(s, params))
   defer: discard sqlite3.reset(s)
   return step(s) == SQLITE_ROW
 
 
 proc rowExists*(db: SQLiteral, sql: string): bool {.inline.} =
-  ## Returns true if query returns any rows
+  ## | Returns true if query returns any rows.
+  ## | For security reasons, this proc should be used with caution.
   if(unlikely) db.loggerproc != nil: db.loggerproc(db, sql, 0)
   let preparedstatement = db.prepareSql(sql.cstring)
   defer: discard finalize(preparedstatement)
@@ -429,8 +475,9 @@ template withRow*(db: SQLiteral, sql: string, row, body: untyped) =
   ## | Dynamically prepares and finalizes an sql query.
   ## | Name for the resulting prepared statement is given with row parameter.  
   ## | The code block will be executed only if query returns a row.
+  ## | For security and performance reasons, this proc should be used with caution.
   if(unlikely) db.loggerproc != nil: db.loggerproc(db, sql, 0)
-  let preparedstatement = db.prepareSql(sql.cstring)
+  let preparedstatement = prepareSql(db, sql.cstring)
   try:
     if step(preparedstatement) == SQLITE_ROW:
       var row {.inject.} = preparedstatement
@@ -443,6 +490,7 @@ template withRowOr*(db: SQLiteral, sql: string, row, body1, body2: untyped) =
   ## | Dynamically prepares and finalizes an sql query.
   ## | Name for the resulting prepared statement is given with row parameter.  
   ## | First block will be executed if query returns a row, otherwise the second block.
+  ## | For security and performance reasons, this proc should be used with caution.
   ## **Example:**
   ## 
   ## .. code-block:: Nim
@@ -453,7 +501,7 @@ template withRowOr*(db: SQLiteral, sql: string, row, body1, body2: untyped) =
   ##    echo "we have a fresh database"
   ## 
   if(unlikely) db.loggerproc != nil: db.loggerproc(db, sql, 0)
-  let preparedstatement = db.prepareSql(sql.cstring)
+  let preparedstatement = prepareSql(db, sql.cstring)
   try:
     if step(preparedstatement) == SQLITE_ROW:
       var row {.inject.} = preparedstatement
@@ -464,12 +512,12 @@ template withRowOr*(db: SQLiteral, sql: string, row, body1, body2: untyped) =
 
 
 template withRow*(db: SQLiteral, statement: enum, params: varargs[DbValue, toDb], row, body: untyped) {.dirty.} =
-  ## | Executes given prepared statement.
+  ## | Executes given statement.
   ## | Name for the prepared statement is given with row parameter.
   ## | The code block will be executed only if query returns a row.
-  if(unlikely) db.loggerproc != nil: db.doLog($statement, params)
-  let s = db.preparedstatements[ord(statement)]
-  defer: discard reset(s)
+  if(unlikely) db.loggerproc != nil: doLog(db, $statement, params)
+  let s = db.preparedstatements[db.threadi][ord(statement)]
+  defer: discard sqlite3.reset(s)
   checkRc(db, bindParams(s, params))
   if step(s) == SQLITE_ROW:
     var row {.inject.} = s
@@ -477,11 +525,11 @@ template withRow*(db: SQLiteral, statement: enum, params: varargs[DbValue, toDb]
     
 
 template withRowOr*(db: SQLiteral, statement: enum, params: varargs[DbValue, toDb], row, body1, body2: untyped) =
-  ## | Executes given prepared statement.
+  ## | Executes given statement.
   ## | Name for the prepared statement is given with row parameter.  
   ## | First block will be executed if query returns a row, otherwise the second block.
-  if(unlikely) db.loggerproc != nil: db.doLog($statement, params)
-  let s = db.preparedstatements[ord(statement)]
+  if(unlikely) db.loggerproc != nil: doLog(db, $statement, params)
+  let s = db.preparedstatements[db.threadi][ord(statement)]
   checkRc(db, bindParams(s, params))
   try:
     if step(s) == SQLITE_ROW:
@@ -489,8 +537,9 @@ template withRowOr*(db: SQLiteral, statement: enum, params: varargs[DbValue, toD
       body1
     else: body2
   finally:
-    discard reset(s)
+    discard sqlite3.reset(s)
 
+#-----------------------------------------------------------------------------------------------------------
 
 proc exec*(db: SQLiteral, pstatement: Pstmt, params: varargs[DbValue, toDb]) {.inline.} =
   ## Executes given prepared statement
@@ -503,7 +552,7 @@ proc exec*(db: SQLiteral, pstatement: Pstmt, params: varargs[DbValue, toDb]) {.i
 proc exec*(db: SQLiteral, statement: enum, params: varargs[DbValue, toDb]) {.inline.} =
   ## Executes given statement
   if(unlikely) db.loggerproc != nil: log()
-  let s = db.preparedstatements[ord(statement)]
+  let s = db.preparedstatements[db.threadi][ord(statement)]
   defer: discard sqlite3.reset(s)
   checkRc(db, bindParams(s, params))
   checkRc(db, step(s))
@@ -511,6 +560,7 @@ proc exec*(db: SQLiteral, statement: enum, params: varargs[DbValue, toDb]) {.inl
 
 proc exes*(db: SQLiteral, sql: string) =
   ## | Prepares, executes and finalizes given semicolon-separated sql statements.
+  ## | For security and performance reasons, this proc should be used with caution.
   if(unlikely) db.loggerproc != nil: db.loggerproc(db, sql, -1)
   var errormsg: cstring
   let rescode = sqlite3.exec(db.sqlite, sql.cstring, nil, nil, errormsg)
@@ -520,14 +570,14 @@ proc exes*(db: SQLiteral, sql: string) =
       error = $errormsg
       free(errormsg)
     if(unlikely) db.loggerproc != nil: db.loggerproc(db, error, rescode)
-    raise (ref SQLError)(msg: db.dbname & " " & $rescode & " " & error)
+    raise SQLError(msg: db.dbname & " " & $rescode & " " & error)
 
 
 proc insert*(db: SQLiteral, statement: enum, params: varargs[DbValue, toDb]): int64 {.inline.} =
   ## | Executes given statement and, if succesful, returns db.getLastinsertRowid().
   ## | If not succesful, returns -2147483647 (low(int32) + 1).
   if(unlikely) db.loggerproc != nil: log()
-  let s = db.preparedstatements[ord(statement)]
+  let s = db.preparedstatements[db.threadi][ord(statement)]
   defer: discard sqlite3.reset(s)
   checkRc(db, bindParams(s, params))
   result =
@@ -571,18 +621,18 @@ template transaction*(db: var SQLiteral, body: untyped) =
   ## | In WAL mode (the default), independent reads must NOT be wrapped in transaction to allow parallel processing.
   if not db.inreadonlymode:
     acquire(db.transactionlock)
-    db.exec(db.Transaction)
+    exec(db, db.Transaction)
     db.intransaction = true
     if(unlikely) db.loggerproc != nil: db.loggerproc(db, "--- BEGIN TRANSACTION", 0)
     try: body
     except Exception as ex:
-      db.exec(db.Rollback)
+      exec(db, db.Rollback)
       if(unlikely) db.loggerproc != nil: db.loggerproc(db, "--- ROLLBACK", 0)
       db.intransaction = false
       raise ex
     finally:
       if db.intransaction:
-        db.exec(db.Commit)
+        exec(db, db.Commit)
         if db.oncommitproc != nil: db.oncommitproc(db)
         db.intransaction = false
         if(unlikely) db.loggerproc != nil: db.loggerproc(db, "--- COMMIT", 0)
@@ -602,15 +652,6 @@ template transactionsDisabled*(db: var SQLiteral, body: untyped) =
 
 proc isIntransaction*(db: SQLiteral): bool {.inline.} =
   return db.intransaction
-
-
-proc createStatement(db: var SQLiteral, statement: enum) =
-  let index = ord(statement)
-  assert(index < MaxStatements, "Statement index " & $index & " out of MaxStatements: " & $MaxStatements)
-  assert(db.preparedstatements[index] == nil, "statement index " & $index & " is already in use")
-  if(unlikely) db.loggerproc != nil: db.loggerproc(db, $statement, -1)
-  db.preparedstatements[index] = prepareSql(db, ($statement).cstring)
-  if index > db.laststatementindex: db.laststatementindex = index
 
 
 proc setLogger*(db: var SQLiteral, logger: proc(sqliteral: SQLiteral, statement: string, code: int)
@@ -633,9 +674,43 @@ proc setOnCommitCallback*(db: var SQLiteral, oncommit: proc(sqliteral: SQLiteral
   ## Set callback procedure that is triggered inside transaction proc, when commit to database has been executed.
   db.oncommitproc = oncommit
 
+#-----------------------------------------------------------------------------------------------------------
+
+template withInternal(db: SQLiteral, statement: enum, params: varargs[DbValue, toDb], body: untyped) {.dirty.} =
+  if(unlikely) db.loggerproc != nil: db.loggerproc(db, $statement & " " & $params, -1)
+  let row {.inject.} = db.internalstatements[db.threadi][ord(statement)]
+  defer: discard sqlite3.reset(row)
+  checkRc(db, bindParams(row, params))
+  if step(row) == SQLITE_ROW:
+    body
+  else: raise (ref Exception)(msg: "Internal sql failed: " & $statement & " " & $params)
+
+
+proc json_extract*(db: var SQLiteral, path: string, jsonstring: varargs[DbValue, toDb]): string =
+  assert(jsonstring.len == 1)
+  db.withInternal(Jsonextract, jsonstring[0], path): row.getString(0)
+
+proc json_patch*(db: var SQLiteral, patch: string, jsonstring: varargs[DbValue, toDb]): string =
+  assert(jsonstring.len == 1)
+  db.withInternal(Jsonpatch, jsonstring[0], patch): row.getString(0)
+
+proc json_valid*(db: var SQLiteral, jsonstring: varargs[DbValue, toDb]): bool =
+  assert(jsonstring.len == 1)
+  db.withInternal(Jsonvalid, jsonstring[0]):
+    row.getInt(0) == 1
+
+iterator json_tree*(db: SQLiteral, jsonstring: varargs[DbValue, toDb]): PStmt =
+  assert(jsonstring.len == 1)
+  if(unlikely) db.loggerproc != nil: db.loggerproc(db, ($Jsontree).replace("?", $jsonstring[0]), -1)
+  let s = db.internalstatements[db.threadi][ord(Jsontree)]
+  checkRc(db, bindParams(s, jsonstring[0]))
+  defer: discard sqlite3.reset(s)
+  while step(s) == SQLITE_ROW: yield s
+
+# -------------------------------------------------------------------------------------------------------------
 
 proc openDatabase*(db: var SQLiteral, dbname: string, schemas: openArray[string],
- Statements: typedesc[enum], maxKbSize = 0, wal = true, ignorecolumnduplicates = true) =
+ maxKbSize = 0, wal = true, ignorecolumnduplicates = true) =
   ## Opens an exclusive connection, boots up the database, executes given schemas and prepares given statements.
   ## 
   ## If dbname is not a path, current working directory will be used.
@@ -650,7 +725,6 @@ proc openDatabase*(db: var SQLiteral, dbname: string, schemas: openArray[string]
   doAssert dbname != ""
   initLock(db.transactionlock)
   db.dbname = dbname
-  db.laststatementindex = -1
   db.checkRc(open(dbname, db.sqlite))
  
   db.exes("PRAGMA encoding = 'UTF-8'")
@@ -673,16 +747,37 @@ proc openDatabase*(db: var SQLiteral, dbname: string, schemas: openArray[string]
   db.Transaction = db.prepareSql("BEGIN IMMEDIATE".cstring)
   db.Commit = db.prepareSql("COMMIT".cstring)
   db.Rollback = db.prepareSql("ROLLBACK".cstring)
-  for v in low(Statements) .. high(Statements): db.createStatement(v) #ord(v), ($v).cstring)
   if db.loggerproc != nil: db.loggerproc(db, "opened", -1)
   elif defined(fulldebug): echo "notice: fulldebug defined but logger not set for ", db.dbname
   
 
 proc openDatabase*(db: var SQLiteral, dbname: string, schema: string,
- Statements: typedesc[enum], maxKbSize = 0, wal = true, ignorecolumnduplicates = true) {.inline.} =
+ maxKbSize = 0, wal = true, ignorecolumnduplicates = true) {.inline.} =
   ## Open database with a single schema.
-  openDatabase(db, dbname, [schema], Statements, maxKbSize, wal, ignorecolumnduplicates)
-  
+  openDatabase(db, dbname, [schema], maxKbSize, wal, ignorecolumnduplicates)
+
+
+proc createStatement(db: var SQLiteral, statement: enum) =
+  let index = ord(statement)
+  if(unlikely) db.loggerproc != nil: db.loggerproc(db, $statement, -1)
+  db.preparedstatements[db.threadlen][index] = prepareSql(db, ($statement).cstring)
+
+
+var preparelock: Lock
+initLock(preparelock)
+
+proc prepareStatements*(db: var SQLiteral, Statements: typedesc[enum]) =
+  withLock(preparelock):
+    when compileOption("threads"):
+      db.threadindices[db.threadlen] = getThreadId()
+    else:
+      db.threadindices[db.threadlen] = 0
+    for v in low(Statements) .. high(Statements): db.createStatement(v)
+    for v in low(InternalStatements) .. high(InternalStatements):
+      db.internalstatements[db.threadlen][ord(v)] =  prepareSql(db, ($v).cstring)    
+    db.threadlen.inc
+    db.laststatementindex = ord(high(Statements))
+    
 
 proc setReadonly*(db: var SQLiteral, readonly: bool) =
   ## When in readonly mode:
@@ -792,7 +887,7 @@ proc about*(db: SQLiteral) =
   discard finalize(Get_options)
   echo "Pagesize=", $db.getTheInt("PRAGMA page_size")
   echo "WALautocheckpoint=", $db.getTheInt("PRAGMA wal_autocheckpoint")
-  echo "Preparedstatements=", $(db.laststatementindex + 1)
+  if db.preparedstatements.len > 0: echo "Preparedstatements=", $(db.preparedstatements[0].len)
   let filesize = getFileSize(db.dbname)
   echo "Filesize=", filesize
   if db.maxsize > 0:
@@ -801,22 +896,19 @@ proc about*(db: SQLiteral) =
   echo ""
 
 
-proc finalizeStatements(db: var SQLiteral) =
-  if db.Transaction == nil: return
-  discard db.Transaction.finalize()
-  db.Transaction = nil
-  discard db.Commit.finalize()
-  discard db.Rollback.finalize()
-  for i in 0 .. db.laststatementindex: discard db.preparedstatements[i].finalize()
-
-
 proc close*(db: var SQLiteral) =
   ## Closes the database.
-  if db.laststatementindex == -1: return
   var rc = 0
   acquire(db.transactionlock)
   try:
-    finalizeStatements(db)
+    for thread in 0 ..< db.threadlen:
+      for i in 0 .. db.laststatementindex:
+        discard db.preparedstatements[thread][i].finalize()
+      for s in db.internalstatements[thread]: discard s.finalize()
+    discard db.Transaction.finalize()
+    db.Transaction = nil
+    discard db.Commit.finalize()
+    discard db.Rollback.finalize()
     rc = close(db.sqlite)
     if rc == SQLITE_OK:
       if db.loggerproc != nil: db.loggerproc(db, "closed", 0)
@@ -825,6 +917,5 @@ proc close*(db: var SQLiteral) =
     if db.loggerproc == nil: echo "Could not close ", db.dbname, ": ", getCurrentExceptionMsg()
     elif rc == 0: db.loggerproc(db, getCurrentExceptionMsg(), 1)
   finally:
-    db.laststatementindex = -1
     release(db.transactionlock)
     deinitLock(db.transactionlock)
