@@ -4,15 +4,15 @@ const SQLiteralVersion* = "2.0.0"
 # MIT Licensed
 
 ## A high level SQLite API with support for multi-threading, prepared statements,
-## proper typing, zero-copy data paths, debugging, json, optimizing, backups, and more.
+## proper typing, zero-copy data paths, debugging, JSON, optimizing, backups, and more.
 ## 
-## Example
-## ==================
+## Example (using JSON extensions)
+## ===============================
 ##
 ## .. code-block:: Nim
 ##  
 ##  # nim c --threads:on example
-##  #(works if sqlite compiled with json extensions)
+##  #(works if sqlite compiled with JSON extensions)
 ##  
 ##  # nim c -d:danger --gc:orc -d:staticSqlite --experimental:views --threads:on example
 ##  # (works if sqlite3.c in path)
@@ -117,6 +117,7 @@ type
     sqlite*: PSqlite3
     dbname*: string
     inreadonlymode*: bool
+    backupsinprogress*: int
     intransaction: bool
     walmode: bool 
     maxsize: int
@@ -426,7 +427,6 @@ proc getTheString*(db: SQLiteral, statement: enum, params: varargs[DbValue, toDb
   ## | If query does not return any rows, returns empty string.
   ## | Automatically resets the statement.
   if(unlikely) db.loggerproc != nil: log()
-  let i = db.threadi
   let s = db.preparedstatements[db.threadi][ord(statement)]
   checkRc(db, bindParams(s, params))
   defer: discard sqlite3.reset(s)
@@ -570,7 +570,7 @@ proc exes*(db: SQLiteral, sql: string) =
       error = $errormsg
       free(errormsg)
     if(unlikely) db.loggerproc != nil: db.loggerproc(db, error, rescode)
-    raise SQLError(msg: db.dbname & " " & $rescode & " " & error)
+    raise SQLError(msg: db.dbname & " " & $rescode & " " & error, rescode: rescode)
 
 
 proc insert*(db: SQLiteral, statement: enum, params: varargs[DbValue, toDb]): int64 {.inline.} =
@@ -710,7 +710,7 @@ iterator json_tree*(db: SQLiteral, jsonstring: varargs[DbValue, toDb]): PStmt =
 # -------------------------------------------------------------------------------------------------------------
 
 proc openDatabase*(db: var SQLiteral, dbname: string, schemas: openArray[string],
- maxKbSize = 0, wal = true, ignorecolumnduplicates = true) =
+ maxKbSize = 0, wal = true, ignorableschemaerrors: openArray[string] = @["duplicate column name"]) =
   ## Opens an exclusive connection, boots up the database, executes given schemas and prepares given statements.
   ## 
   ## If dbname is not a path, current working directory will be used.
@@ -722,6 +722,29 @@ proc openDatabase*(db: var SQLiteral, dbname: string, schemas: openArray[string]
   ## 
   ## If maxKbSize == 0, database size is limited only by OS or hardware with possibly severe consequences.
   ##
+  ## `ignorableschemaerrors` is a list of error message snippets for sql errors that are to be ignored.
+  ## If a clause may error, it must be given in a separate schema as its unique clause.
+  ## If * is given as ignorable error, it means that all errors will be ignored.
+  ## Note that by default, duplicate column name -errors will be ignored. Example below.
+  ##
+  ## .. code-block:: Nim
+  ## 
+  ##  const
+  ##    Schema1 = "CREATE TABLE IF NOT EXISTS Example(data TEXT NOT NULL)"
+  ##    Schema2 = "this is to be ignored"
+  ##    Schema3 = """ALTER TABLE Example ADD COLUMN newcolumn TEXT NOT NULL DEFAULT """""
+  ## 
+  ##  var db1, db2, db3: SQLiteral
+  ## 
+  ##  proc logger(db: SQLiteral, msg: string, code: int) = echo msg
+  ##  db1.setLogger(logger); db2.setLogger(logger); db3.setLogger(logger)
+  ## 
+  ##  db1.openDatabase("example1.db", [Schema1, Schema3]); db1.close()
+  ##  db2.openDatabase("example2.db", [Schema1, Schema2],
+  ##   ignorableschemaerrors = ["""this": syntax error"""]); db2.close()
+  ##  db3.openDatabase("example3.db", [Schema1, Schema2, Schema3],
+  ##   ignorableschemaerrors = ["*"]); db3.close()
+  ## 
   doAssert dbname != ""
   initLock(db.transactionlock)
   db.dbname = dbname
@@ -742,19 +765,20 @@ proc openDatabase*(db: var SQLiteral, dbname: string, schemas: openArray[string]
   for schema in schemas:
     try: db.exes(schema)
     except:
-      echo getCurrentExceptionMsg()
-      if not (ignorecolumnduplicates and getCurrentExceptionMsg().contains("duplicate column name")): raise
+      var ignorable = false
+      for ignorableerror in ignorableschemaerrors:
+        if ignorableerror == "*" or getCurrentExceptionMsg().contains(ignorableerror): (ignorable = true; break)
+      if not ignorable: raise
   db.Transaction = db.prepareSql("BEGIN IMMEDIATE".cstring)
   db.Commit = db.prepareSql("COMMIT".cstring)
   db.Rollback = db.prepareSql("ROLLBACK".cstring)
-  if db.loggerproc != nil: db.loggerproc(db, "opened", -1)
+  if db.loggerproc != nil: db.loggerproc(db, db.dbname & " opened", -1)
   elif defined(fulldebug): echo "notice: fulldebug defined but logger not set for ", db.dbname
   
 
-proc openDatabase*(db: var SQLiteral, dbname: string, schema: string,
- maxKbSize = 0, wal = true, ignorecolumnduplicates = true) {.inline.} =
+proc openDatabase*(db: var SQLiteral, dbname: string, schema: string, maxKbSize = 0, wal = true) {.inline.} =
   ## Open database with a single schema.
-  openDatabase(db, dbname, [schema], maxKbSize, wal, ignorecolumnduplicates)
+  openDatabase(db, dbname, [schema], maxKbSize, wal, @[])
 
 
 proc createStatement(db: var SQLiteral, statement: enum) =
@@ -767,6 +791,9 @@ var preparelock: Lock
 initLock(preparelock)
 
 proc prepareStatements*(db: var SQLiteral, Statements: typedesc[enum]) =
+  ## Prepares the statements given as enum parameter.
+  ## Call this exactly once from every thread that is going to access the database.
+  ## Main example shows how this "exactly once"-requirement can be achieved with a boolean threadvar.
   withLock(preparelock):
     when compileOption("threads"):
       db.threadindices[db.threadlen] = getThreadId()
@@ -830,18 +857,20 @@ proc optimize*(db: var SQLiteral, pagesize = -1, walautocheckpoint = -1) =
     release(db.transactionlock)
 
 
-proc initBackup*(db: SQLiteral, backupfilename: string):
+proc initBackup*(db: var SQLiteral, backupfilename: string):
  tuple[backupdb: Psqlite3, backuphandle: PSqlite3_Backup] =
   ## Initializes backup processing, returning variables to use with `stepBackup` proc.
   ## 
   ## Note that `close` will fail with SQLITE_BUSY if there's an unfinished backup process going on.
   db.checkRc(open(backupfilename, result.backupdb))
-  result.backuphandle = backup_init(result.backupdb, "main".cstring, db.sqlite, "main".cstring)
-  if result.backuphandle == nil: db.checkRc(SQLITE_NULL)
-  if db.loggerproc != nil: db.loggerproc(db, "backup to " & backupfilename, 0)
+  db.transactionsDisabled:
+    result.backuphandle = backup_init(result.backupdb, "main".cstring, db.sqlite, "main".cstring)
+    if result.backuphandle == nil: db.checkRc(SQLITE_NULL)
+    elif db.loggerproc != nil: db.loggerproc(db, "backup to " & backupfilename, 0)
+    discard db.backupsinprogress.atomicInc
 
 
-proc stepBackup*(db: SQLiteral, backupdb: Psqlite3, backuphandle: PSqlite3_Backup, pagesperportion = 5.int32): int =
+proc stepBackup*(db: var SQLiteral, backupdb: Psqlite3, backuphandle: PSqlite3_Backup, pagesperportion = 5.int32): int =
   ## Backs up a portion of the database pages (default: 5) to a destination initialized with `initBackup`.
   ##
   ## Returns percentage of progress; 100% means that backup has been finished.
@@ -865,15 +894,26 @@ proc stepBackup*(db: SQLiteral, backupdb: Psqlite3, backuphandle: PSqlite3_Backu
   if rc == SQLITE_DONE:
     db.checkRc(backup_finish(backuphandle))
     db.checkRc(backupdb.close())
+    discard db.backupsinprogress.atomicDec
     if db.loggerproc != nil: db.loggerproc(db, "backup ok", 0)
     return 100
   if rc notin [SQLITE_OK, SQLITE_BUSY, SQLITE_LOCKED]:
+    discard db.backupsinprogress.atomicDec
     if db.loggerproc != nil: db.loggerproc(db, "backup failed", rc)
     discard backup_finish(backuphandle)
     discard backupdb.close()
     db.checkRc(rc)
   return 100 * (backuphandle.backup_pagecount - backuphandle.backup_remaining) div backuphandle.backup_pagecount
 
+
+proc cancelBackup*(db: var SQLiteral, backupdb: Psqlite3, backuphandle: PSqlite3_Backup) =
+  ## Cancels an ongoing backup process.
+  if unlikely(backupdb == nil or backuphandle == nil): db.checkRc(SQLITE_NULL)
+  discard backup_finish(backuphandle)
+  discard backupdb.close()
+  discard db.backupsinprogress.atomicDec  
+  if db.loggerproc != nil: db.loggerproc(db, "backup canceled", 0)
+  
 
 proc about*(db: SQLiteral) =
   ## Echoes some info about the database.
@@ -896,8 +936,44 @@ proc about*(db: SQLiteral) =
   echo ""
 
 
+when defined(staticSqlite):
+  proc db_status(db: PSqlite3, op: int32, cur: ptr int32, highest: ptr int32, reset: int32): int32 {.cdecl, importc: "sqlite3_db_status".}
+else:
+  when defined(windows):
+    when defined(nimOldDlls):
+      const Lib = "sqlite3.dll"
+    elif defined(cpu64):
+      const Lib = "sqlite3_64.dll"
+    else:
+      const Lib = "sqlite3_32.dll"
+  elif defined(macosx):
+    const Lib = "libsqlite3(|.0).dylib"
+  else:
+    const Lib = "libsqlite3.so(|.0)"
+  proc db_status(db: PSqlite3, op: int32, cur: ptr int32, highest: ptr int32, reset: int32): int32 {.cdecl, dynlib: Lib, importc: "sqlite3_db_status".}
+
+proc getStatus*(db: SQLiteral, status: int, resethighest = false): (int, int) =
+  ## Retrieves queried status info.
+  ## See https://www.sqlite.org/c3ref/c_dbstatus_options.html
+  ## 
+  ## **Example:**
+  ## 
+  ## .. code-block:: Nim
+  ## 
+  ##    const SQLITE_DBSTATUS_CACHE_USED = 1
+  ##    echo "current cache usage: ", db.getStatus(SQLITE_DBSTATUS_CACHE_USED)[0]
+  var c, h: int32
+  db.checkRc(db_status(db.sqlite, status.int32, addr c, addr h, resethighest.int32))
+  return (c.int, h.int)
+
+
 proc close*(db: var SQLiteral) =
   ## Closes the database.
+  if db.Transaction == nil:
+    if db.loggerproc != nil: db.loggerproc(db, "already closed: " & db.dbname, -1)
+    return
+  if db.backupsinprogress > 0:
+    raise SQLError(msg: "Cannot close, backups still in progress: " & $db.backupsinprogress, rescode: SQLITE_BUSY)
   var rc = 0
   acquire(db.transactionlock)
   try:
@@ -906,16 +982,16 @@ proc close*(db: var SQLiteral) =
         discard db.preparedstatements[thread][i].finalize()
       for s in db.internalstatements[thread]: discard s.finalize()
     discard db.Transaction.finalize()
-    db.Transaction = nil
     discard db.Commit.finalize()
     discard db.Rollback.finalize()
     rc = close(db.sqlite)
     if rc == SQLITE_OK:
-      if db.loggerproc != nil: db.loggerproc(db, "closed", 0)
+      db.Transaction = nil
+      if db.loggerproc != nil: db.loggerproc(db, db.dbname & " closed", 0)
     else: db.checkRc(rc)
   except:
     if db.loggerproc == nil: echo "Could not close ", db.dbname, ": ", getCurrentExceptionMsg()
     elif rc == 0: db.loggerproc(db, getCurrentExceptionMsg(), 1)
   finally:
     release(db.transactionlock)
-    deinitLock(db.transactionlock)
+    if db.Transaction == nil: deinitLock(db.transactionlock)

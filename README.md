@@ -10,7 +10,7 @@ zero-copy data paths, debugging, JSON, optimizing, backups, and more...
 [2.0.0](http://htmlpreview.github.io/?https://github.com/olliNiinivaara/SQLiteral/blob/master/doc/sqliteral200.html)
 
 
-## Installation
+## Installation (upgrade to 2.0.0 pre-release is recommended)
 1.3.0: `nimble install sqliteral`
 
 2.0.0: `nimble install sqliteral@#head`
@@ -22,11 +22,14 @@ zero-copy data paths, debugging, JSON, optimizing, backups, and more...
 * database open supports multiple schemas
 * partition states removed
 
-**2.0.0 pre-release (2021-02-24) current master**
-* thread-local isolated data structures make all interferences between threads impossible
+**2.0.0 pre-release (2021-03-03) current master**
+* thread-isolating data structures guarantee interference-free db operations
 * better support for experimental:views -based zero-copy strings
 * JSON helper functions, JSON in documentation example
 * breaking API change: New prepareStatements() proc must be used
+* Selected errors during schema migrations can ignored, such as creating duplicate column name
+* backup processes can be canceled
+* getStatus proc for https://www.sqlite.org/c3ref/c_dbstatus_options.html
 
 ## Example (version 2.0.0)
 

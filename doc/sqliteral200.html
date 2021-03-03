@@ -961,6 +961,7 @@ span.attachedType {
   visibility: hidden;
 }
 
+
 </style>
 
 </head>
@@ -996,7 +997,7 @@ span.attachedType {
     </select>
   </div>
   <ul class="simple simple-toc" id="toc-list">
-<li><a class="reference" id="example_toc" href="#example">Example</a></li>
+<li><a class="reference" id="example-using-json-extensions_toc" href="#example-using-json-extensions">Example (using JSON extensions)</a></li>
 <li><a class="reference" id="compiling-with-sqlite3dotc_toc" href="#compiling-with-sqlite3dotc">Compiling with sqlite3.c</a></li>
 <li>
   <a class="reference reference-toplevel" href="#7" id="57">Types</a>
@@ -1009,6 +1010,7 @@ span.attachedType {
   sqlite*: PSqlite3
   dbname*: string
   inreadonlymode*: bool
+  backupsinprogress*: int
   intransaction: bool
   walmode: bool
   maxsize: int
@@ -1108,7 +1110,7 @@ span.attachedType {
   </ul>
   <ul class="simple nested-toc-section">initBackup
       <li><a class="reference" href="#initBackup%2CSQLiteral%2Cstring"
-    title="initBackup(db: SQLiteral; backupfilename: string): tuple[backupdb: PSqlite3,
+    title="initBackup(db: var SQLiteral; backupfilename: string): tuple[backupdb: PSqlite3,
     backuphandle: PSqlite3_Backup]">initBackup,<wbr>SQLiteral,<wbr>string</a></li>
 
   </ul>
@@ -1152,18 +1154,30 @@ span.attachedType {
     title="isIntransaction(db: SQLiteral): bool">isIntransaction,<wbr>SQLiteral</a></li>
 
   </ul>
+  <ul class="simple nested-toc-section">cancelBackup
+      <li><a class="reference" href="#cancelBackup%2CSQLiteral%2CPSqlite3%2CPSqlite3_Backup"
+    title="cancelBackup(db: var SQLiteral; backupdb: PSqlite3;
+             backuphandle: PSqlite3_Backup)">cancelBackup,<wbr>SQLiteral,<wbr>PSqlite3,<wbr>PSqlite3_Backup</a></li>
+
+  </ul>
   <ul class="simple nested-toc-section">openDatabase
-      <li><a class="reference" href="#openDatabase%2CSQLiteral%2Cstring%2CopenArray%5Bstring%5D%2Cint"
+      <li><a class="reference" href="#openDatabase%2CSQLiteral%2Cstring%2CopenArray%5Bstring%5D%2Cint%2CopenArray%5Bstring%5D"
     title="openDatabase(db: var SQLiteral; dbname: string; schemas: openArray[string];
-             maxKbSize = 0; wal = true; ignorecolumnduplicates = true)">openDatabase,<wbr>SQLiteral,<wbr>string,<wbr>openArray[string],<wbr>int</a></li>
+             maxKbSize = 0; wal = true; ignorableschemaerrors: openArray[string] = @[
+    &quot;duplicate column name&quot;])">openDatabase,<wbr>SQLiteral,<wbr>string,<wbr>openArray[string],<wbr>int,<wbr>openArray[string]</a></li>
   <li><a class="reference" href="#openDatabase%2CSQLiteral%2Cstring%2Cstring%2Cint"
     title="openDatabase(db: var SQLiteral; dbname: string; schema: string; maxKbSize = 0;
-             wal = true; ignorecolumnduplicates = true)">openDatabase,<wbr>SQLiteral,<wbr>string,<wbr>string,<wbr>int</a></li>
+             wal = true)">openDatabase,<wbr>SQLiteral,<wbr>string,<wbr>string,<wbr>int</a></li>
 
   </ul>
   <ul class="simple nested-toc-section">optimize
       <li><a class="reference" href="#optimize%2CSQLiteral"
     title="optimize(db: var SQLiteral; pagesize = -1; walautocheckpoint = -1)">optimize,<wbr>SQLiteral</a></li>
+
+  </ul>
+  <ul class="simple nested-toc-section">getStatus
+      <li><a class="reference" href="#getStatus%2CSQLiteral%2Cint"
+    title="getStatus(db: SQLiteral; status: int; resethighest = false): (int, int)">getStatus,<wbr>SQLiteral,<wbr>int</a></li>
 
   </ul>
   <ul class="simple nested-toc-section">getTheString
@@ -1252,7 +1266,7 @@ span.attachedType {
   </ul>
   <ul class="simple nested-toc-section">stepBackup
       <li><a class="reference" href="#stepBackup%2CSQLiteral%2CPSqlite3%2CPSqlite3_Backup"
-    title="stepBackup(db: SQLiteral; backupdb: PSqlite3; backuphandle: PSqlite3_Backup;
+    title="stepBackup(db: var SQLiteral; backupdb: PSqlite3; backuphandle: PSqlite3_Backup;
            pagesperportion = 5.int32): int">stepBackup,<wbr>SQLiteral,<wbr>PSqlite3,<wbr>PSqlite3_Backup</a></li>
 
   </ul>
@@ -1322,9 +1336,9 @@ span.attachedType {
   <div class="nine columns" id="content">
   <div id="tocRoot"></div>
   
-  <p class="module-desc">A high level SQLite API with support for multi-threading, prepared statements, proper typing, zero-copy data paths, debugging, json, optimizing, backups, and more.
-<h1><a class="toc-backref" id="example" href="#example">Example</a></h1><pre class="listing"><span class="Comment"># nim c --threads:on example</span>
-<span class="Comment">#(works if sqlite compiled with json extensions)</span>
+  <p class="module-desc">A high level SQLite API with support for multi-threading, prepared statements, proper typing, zero-copy data paths, debugging, JSON, optimizing, backups, and more.
+<h1><a class="toc-backref" id="example-using-json-extensions" href="#example-using-json-extensions">Example (using JSON extensions)</a></h1><pre class="listing"><span class="Comment"># nim c --threads:on example</span>
+<span class="Comment">#(works if sqlite compiled with JSON extensions)</span>
 
 <span class="Comment"># nim c -d:danger --gc:orc -d:staticSqlite --experimental:views --threads:on example</span>
 <span class="Comment"># (works if sqlite3.c in path)</span>
@@ -1336,7 +1350,8 @@ span.attachedType {
 <span class="Keyword">const</span> <span class="Identifier">Schema</span> <span class="Operator">=</span> <span class="StringLit">&quot;CREATE TABLE IF NOT EXISTS Example(name TEXT NOT NULL, jsondata TEXT NOT NULL)&quot;</span>
 
 <span class="Keyword">type</span> <span class="Identifier">SqlStatements</span> <span class="Operator">=</span> <span class="Keyword">enum</span>
-  <span class="Identifier">Insert</span> <span class="Operator">=</span> <span class="StringLit">&quot;INSERT INTO Example (name, jsondata) VALUES (json_extract(?, '$.name'), json_extract(?, '$.data'))&quot;</span>
+  <span class="Identifier">Insert</span> <span class="Operator">=</span> <span class="LongStringLit">&quot;&quot;&quot;INSERT INTO Example (name, jsondata)
+   VALUES (json_extract(?, '$.name'), json_extract(?, '$.data'))&quot;&quot;&quot;</span>
   <span class="Identifier">Count</span> <span class="Operator">=</span> <span class="StringLit">&quot;SELECT count(*) FROM Example&quot;</span>
   <span class="Identifier">Select</span> <span class="Operator">=</span> <span class="StringLit">&quot;SELECT json_extract(jsondata, '$.array') FROM Example&quot;</span>
 
@@ -1391,6 +1406,7 @@ span.attachedType {
   <span class="Identifier">sqlite</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">PSqlite3</span>
   <span class="Identifier">dbname</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">string</span>
   <span class="Identifier">inreadonlymode</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">bool</span>
+  <span class="Identifier">backupsinprogress</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">int</span>
   <span class="Identifier">intransaction</span><span class="Other">:</span> <span class="Identifier">bool</span>
   <span class="Identifier">walmode</span><span class="Other">:</span> <span class="Identifier">bool</span>
   <span class="Identifier">maxsize</span><span class="Other">:</span> <span class="Identifier">int</span>
@@ -1796,22 +1812,38 @@ Set callback procedure that is triggered inside transaction proc, when commit to
 
 
 </dd>
-<a id="openDatabase,SQLiteral,string,openArray[string],int"></a>
-<dt><pre><span class="Keyword">proc</span> <a href="#openDatabase%2CSQLiteral%2Cstring%2CopenArray%5Bstring%5D%2Cint"><span class="Identifier">openDatabase</span></a><span class="Other">(</span><span class="Identifier">db</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="sqliteral.html#SQLiteral"><span class="Identifier">SQLiteral</span></a><span class="Other">;</span> <span class="Identifier">dbname</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span> <span class="Identifier">schemas</span><span class="Other">:</span> <span class="Identifier">openArray</span><span class="Other">[</span><span class="Identifier">string</span><span class="Other">]</span><span class="Other">;</span>
-                  <span class="Identifier">maxKbSize</span> <span class="Other">=</span> <span class="DecNumber">0</span><span class="Other">;</span> <span class="Identifier">wal</span> <span class="Other">=</span> <span class="Identifier">true</span><span class="Other">;</span> <span class="Identifier">ignorecolumnduplicates</span> <span class="Other">=</span> <span class="Identifier">true</span><span class="Other">)</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma">
-    <span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">SQLError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
+<a id="openDatabase,SQLiteral,string,openArray[string],int,openArray[string]"></a>
+<dt><pre><span class="Keyword">proc</span> <a href="#openDatabase%2CSQLiteral%2Cstring%2CopenArray%5Bstring%5D%2Cint%2CopenArray%5Bstring%5D"><span class="Identifier">openDatabase</span></a><span class="Other">(</span><span class="Identifier">db</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="sqliteral.html#SQLiteral"><span class="Identifier">SQLiteral</span></a><span class="Other">;</span> <span class="Identifier">dbname</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span> <span class="Identifier">schemas</span><span class="Other">:</span> <span class="Identifier">openArray</span><span class="Other">[</span><span class="Identifier">string</span><span class="Other">]</span><span class="Other">;</span>
+                  <span class="Identifier">maxKbSize</span> <span class="Other">=</span> <span class="DecNumber">0</span><span class="Other">;</span> <span class="Identifier">wal</span> <span class="Other">=</span> <span class="Identifier">true</span><span class="Other">;</span> <span class="Identifier">ignorableschemaerrors</span><span class="Other">:</span> <span class="Identifier">openArray</span><span class="Other">[</span>
+    <span class="Identifier">string</span><span class="Other">]</span> <span class="Other">=</span> <span class="Operator">@</span><span class="Other">[</span><span class="StringLit">&quot;duplicate column name&quot;</span><span class="Other">]</span><span class="Other">)</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">SQLError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
 <dd>
 
 <p>Opens an exclusive connection, boots up the database, executes given schemas and prepares given statements.</p>
 <p>If dbname is not a path, current working directory will be used.</p>
-<p>If wal = true, database is opened in WAL mode with NORMAL synchronous setting.<br />If wal = false, database is opened in PERSIST mode with FULL synchronous setting.<br /><a class="reference external" href="https://www.sqlite.org/wal.html">https://www.sqlite.org/wal.html</a><br /><a class="reference external" href="https://www.sqlite.org/pragma.html#pragma_synchronous">https://www.sqlite.org/pragma.html#pragma_synchronous</a><br /></p><p>If maxKbSize == 0, database size is limited only by OS or hardware with possibly severe consequences. </p>
+<p>If wal = true, database is opened in WAL mode with NORMAL synchronous setting.<br />If wal = false, database is opened in PERSIST mode with FULL synchronous setting.<br /><a class="reference external" href="https://www.sqlite.org/wal.html">https://www.sqlite.org/wal.html</a><br /><a class="reference external" href="https://www.sqlite.org/pragma.html#pragma_synchronous">https://www.sqlite.org/pragma.html#pragma_synchronous</a><br /></p><p>If maxKbSize == 0, database size is limited only by OS or hardware with possibly severe consequences.</p>
+<p><tt class="docutils literal"><span class="pre">ignorableschemaerrors</span></tt> is a list of error message snippets for sql errors that are to be ignored. If a clause may error, it must be given in a separate schema as its unique clause. If * is given as ignorable error, it means that all errors will be ignored. Note that by default, duplicate column name -errors will be ignored. Example below.</p>
+<pre class="listing"><span class="Keyword">const</span>
+  <span class="Identifier">Schema1</span> <span class="Operator">=</span> <span class="StringLit">&quot;CREATE TABLE IF NOT EXISTS Example(data TEXT NOT NULL)&quot;</span>
+  <span class="Identifier">Schema2</span> <span class="Operator">=</span> <span class="StringLit">&quot;this is to be ignored&quot;</span>
+  <span class="Identifier">Schema3</span> <span class="Operator">=</span> <span class="LongStringLit">&quot;&quot;&quot;ALTER TABLE Example ADD COLUMN newcolumn TEXT NOT NULL DEFAULT &quot;&quot;&quot;&quot;&quot;</span>
 
+<span class="Keyword">var</span> <span class="Identifier">db1</span><span class="Punctuation">,</span> <span class="Identifier">db2</span><span class="Punctuation">,</span> <span class="Identifier">db3</span><span class="Punctuation">:</span> <span class="Identifier">SQLiteral</span>
+
+<span class="Keyword">proc</span> <span class="Identifier">logger</span><span class="Punctuation">(</span><span class="Identifier">db</span><span class="Punctuation">:</span> <span class="Identifier">SQLiteral</span><span class="Punctuation">,</span> <span class="Identifier">msg</span><span class="Punctuation">:</span> <span class="Identifier">string</span><span class="Punctuation">,</span> <span class="Identifier">code</span><span class="Punctuation">:</span> <span class="Identifier">int</span><span class="Punctuation">)</span> <span class="Operator">=</span> <span class="Identifier">echo</span> <span class="Identifier">msg</span>
+<span class="Identifier">db1</span><span class="Operator">.</span><span class="Identifier">setLogger</span><span class="Punctuation">(</span><span class="Identifier">logger</span><span class="Punctuation">)</span><span class="Punctuation">;</span> <span class="Identifier">db2</span><span class="Operator">.</span><span class="Identifier">setLogger</span><span class="Punctuation">(</span><span class="Identifier">logger</span><span class="Punctuation">)</span><span class="Punctuation">;</span> <span class="Identifier">db3</span><span class="Operator">.</span><span class="Identifier">setLogger</span><span class="Punctuation">(</span><span class="Identifier">logger</span><span class="Punctuation">)</span>
+
+<span class="Identifier">db1</span><span class="Operator">.</span><span class="Identifier">openDatabase</span><span class="Punctuation">(</span><span class="StringLit">&quot;example1.db&quot;</span><span class="Punctuation">,</span> <span class="Punctuation">[</span><span class="Identifier">Schema1</span><span class="Punctuation">,</span> <span class="Identifier">Schema3</span><span class="Punctuation">]</span><span class="Punctuation">)</span><span class="Punctuation">;</span> <span class="Identifier">db1</span><span class="Operator">.</span><span class="Identifier">close</span><span class="Punctuation">(</span><span class="Punctuation">)</span>
+<span class="Identifier">db2</span><span class="Operator">.</span><span class="Identifier">openDatabase</span><span class="Punctuation">(</span><span class="StringLit">&quot;example2.db&quot;</span><span class="Punctuation">,</span> <span class="Punctuation">[</span><span class="Identifier">Schema1</span><span class="Punctuation">,</span> <span class="Identifier">Schema2</span><span class="Punctuation">]</span><span class="Punctuation">,</span>
+ <span class="Identifier">ignorableschemaerrors</span> <span class="Operator">=</span> <span class="Punctuation">[</span><span class="LongStringLit">&quot;&quot;&quot;this&quot;: syntax error&quot;&quot;&quot;</span><span class="Punctuation">]</span><span class="Punctuation">)</span><span class="Punctuation">;</span> <span class="Identifier">db2</span><span class="Operator">.</span><span class="Identifier">close</span><span class="Punctuation">(</span><span class="Punctuation">)</span>
+<span class="Identifier">db3</span><span class="Operator">.</span><span class="Identifier">openDatabase</span><span class="Punctuation">(</span><span class="StringLit">&quot;example3.db&quot;</span><span class="Punctuation">,</span> <span class="Punctuation">[</span><span class="Identifier">Schema1</span><span class="Punctuation">,</span> <span class="Identifier">Schema2</span><span class="Punctuation">,</span> <span class="Identifier">Schema3</span><span class="Punctuation">]</span><span class="Punctuation">,</span>
+ <span class="Identifier">ignorableschemaerrors</span> <span class="Operator">=</span> <span class="Punctuation">[</span><span class="StringLit">&quot;*&quot;</span><span class="Punctuation">]</span><span class="Punctuation">)</span><span class="Punctuation">;</span> <span class="Identifier">db3</span><span class="Operator">.</span><span class="Identifier">close</span><span class="Punctuation">(</span><span class="Punctuation">)</span></pre>
 
 </dd>
 <a id="openDatabase,SQLiteral,string,string,int"></a>
 <dt><pre><span class="Keyword">proc</span> <a href="#openDatabase%2CSQLiteral%2Cstring%2Cstring%2Cint"><span class="Identifier">openDatabase</span></a><span class="Other">(</span><span class="Identifier">db</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="sqliteral.html#SQLiteral"><span class="Identifier">SQLiteral</span></a><span class="Other">;</span> <span class="Identifier">dbname</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span> <span class="Identifier">schema</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span>
-                  <span class="Identifier">maxKbSize</span> <span class="Other">=</span> <span class="DecNumber">0</span><span class="Other">;</span> <span class="Identifier">wal</span> <span class="Other">=</span> <span class="Identifier">true</span><span class="Other">;</span> <span class="Identifier">ignorecolumnduplicates</span> <span class="Other">=</span> <span class="Identifier">true</span><span class="Other">)</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma">
-    <span class="Identifier">inline</span><span class="Other">,</span> <span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">SQLError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
+                  <span class="Identifier">maxKbSize</span> <span class="Other">=</span> <span class="DecNumber">0</span><span class="Other">;</span> <span class="Identifier">wal</span> <span class="Other">=</span> <span class="Identifier">true</span><span class="Other">)</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma"><span class="Identifier">inline</span><span class="Other">,</span>
+    <span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">SQLError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
 <dd>
 
 Open database with a single schema.
@@ -1821,7 +1853,7 @@ Open database with a single schema.
 <dt><pre><span class="Keyword">proc</span> <a href="#prepareStatements%2CSQLiteral%2Ctypedesc%5B%5D"><span class="Identifier">prepareStatements</span></a><span class="Other">(</span><span class="Identifier">db</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="sqliteral.html#SQLiteral"><span class="Identifier">SQLiteral</span></a><span class="Other">;</span> <span class="Identifier">Statements</span><span class="Other">:</span> <span class="Identifier">typedesc</span><span class="Other">[</span><span class="Keyword">enum</span><span class="Other">]</span><span class="Other">)</span></pre></dt>
 <dd>
 
-
+Prepares the statements given as enum parameter. Call this exactly once from every thread that is going to access the database. Main example shows how this &quot;exactly once&quot;-requirement can be achieved with a boolean threadvar.
 
 </dd>
 <a id="setReadonly,SQLiteral,bool"></a>
@@ -1849,9 +1881,9 @@ Open database with a single schema.
 
 </dd>
 <a id="initBackup,SQLiteral,string"></a>
-<dt><pre><span class="Keyword">proc</span> <a href="#initBackup%2CSQLiteral%2Cstring"><span class="Identifier">initBackup</span></a><span class="Other">(</span><span class="Identifier">db</span><span class="Other">:</span> <a href="sqliteral.html#SQLiteral"><span class="Identifier">SQLiteral</span></a><span class="Other">;</span> <span class="Identifier">backupfilename</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">)</span><span class="Other">:</span> <span class="Keyword">tuple</span><span class="Other">[</span>
-    <span class="Identifier">backupdb</span><span class="Other">:</span> <span class="Identifier">PSqlite3</span><span class="Other">,</span> <span class="Identifier">backuphandle</span><span class="Other">:</span> <span class="Identifier">PSqlite3_Backup</span><span class="Other">]</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">SQLError</span><span class="Other">]</span><span class="Other">,</span>
-    <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
+<dt><pre><span class="Keyword">proc</span> <a href="#initBackup%2CSQLiteral%2Cstring"><span class="Identifier">initBackup</span></a><span class="Other">(</span><span class="Identifier">db</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="sqliteral.html#SQLiteral"><span class="Identifier">SQLiteral</span></a><span class="Other">;</span> <span class="Identifier">backupfilename</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">)</span><span class="Other">:</span> <span class="Keyword">tuple</span><span class="Other">[</span>
+    <span class="Identifier">backupdb</span><span class="Other">:</span> <span class="Identifier">PSqlite3</span><span class="Other">,</span> <span class="Identifier">backuphandle</span><span class="Other">:</span> <span class="Identifier">PSqlite3_Backup</span><span class="Other">]</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma">
+    <span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">SQLError</span><span class="Other">,</span> <span class="Identifier">SQLError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
 <dd>
 
 <p>Initializes backup processing, returning variables to use with <tt class="docutils literal"><span class="pre">stepBackup</span></tt> proc.</p>
@@ -1860,7 +1892,7 @@ Open database with a single schema.
 
 </dd>
 <a id="stepBackup,SQLiteral,PSqlite3,PSqlite3_Backup"></a>
-<dt><pre><span class="Keyword">proc</span> <a href="#stepBackup%2CSQLiteral%2CPSqlite3%2CPSqlite3_Backup"><span class="Identifier">stepBackup</span></a><span class="Other">(</span><span class="Identifier">db</span><span class="Other">:</span> <a href="sqliteral.html#SQLiteral"><span class="Identifier">SQLiteral</span></a><span class="Other">;</span> <span class="Identifier">backupdb</span><span class="Other">:</span> <span class="Identifier">PSqlite3</span><span class="Other">;</span>
+<dt><pre><span class="Keyword">proc</span> <a href="#stepBackup%2CSQLiteral%2CPSqlite3%2CPSqlite3_Backup"><span class="Identifier">stepBackup</span></a><span class="Other">(</span><span class="Identifier">db</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="sqliteral.html#SQLiteral"><span class="Identifier">SQLiteral</span></a><span class="Other">;</span> <span class="Identifier">backupdb</span><span class="Other">:</span> <span class="Identifier">PSqlite3</span><span class="Other">;</span>
                 <span class="Identifier">backuphandle</span><span class="Other">:</span> <span class="Identifier">PSqlite3_Backup</span><span class="Other">;</span> <span class="Identifier">pagesperportion</span> <span class="Other">=</span> <span class="DecNumber">5</span><span class="Other">.</span><span class="Identifier">int32</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">int</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma">
     <span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">SQLError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
 <dd>
@@ -1877,6 +1909,15 @@ Open database with a single schema.
   <span class="Identifier">progress</span> <span class="Operator">=</span> <span class="Identifier">db</span><span class="Operator">.</span><span class="Identifier">stepBackup</span><span class="Punctuation">(</span><span class="Identifier">backupdb</span><span class="Punctuation">,</span> <span class="Identifier">backuphandle</span><span class="Punctuation">)</span></pre>
 
 </dd>
+<a id="cancelBackup,SQLiteral,PSqlite3,PSqlite3_Backup"></a>
+<dt><pre><span class="Keyword">proc</span> <a href="#cancelBackup%2CSQLiteral%2CPSqlite3%2CPSqlite3_Backup"><span class="Identifier">cancelBackup</span></a><span class="Other">(</span><span class="Identifier">db</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="sqliteral.html#SQLiteral"><span class="Identifier">SQLiteral</span></a><span class="Other">;</span> <span class="Identifier">backupdb</span><span class="Other">:</span> <span class="Identifier">PSqlite3</span><span class="Other">;</span>
+                  <span class="Identifier">backuphandle</span><span class="Other">:</span> <span class="Identifier">PSqlite3_Backup</span><span class="Other">)</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">SQLError</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
+<dd>
+
+Cancels an ongoing backup process.
+
+</dd>
 <a id="about,SQLiteral"></a>
 <dt><pre><span class="Keyword">proc</span> <a href="#about%2CSQLiteral"><span class="Identifier">about</span></a><span class="Other">(</span><span class="Identifier">db</span><span class="Other">:</span> <a href="sqliteral.html#SQLiteral"><span class="Identifier">SQLiteral</span></a><span class="Other">)</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">SQLError</span><span class="Other">,</span> <span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">OSError</span><span class="Other">]</span><span class="Other">,</span>
                             <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">,</span> <span class="Identifier">ReadIOEffect</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
@@ -1885,8 +1926,19 @@ Open database with a single schema.
 Echoes some info about the database.
 
 </dd>
+<a id="getStatus,SQLiteral,int"></a>
+<dt><pre><span class="Keyword">proc</span> <a href="#getStatus%2CSQLiteral%2Cint"><span class="Identifier">getStatus</span></a><span class="Other">(</span><span class="Identifier">db</span><span class="Other">:</span> <a href="sqliteral.html#SQLiteral"><span class="Identifier">SQLiteral</span></a><span class="Other">;</span> <span class="Identifier">status</span><span class="Other">:</span> <span class="Identifier">int</span><span class="Other">;</span> <span class="Identifier">resethighest</span> <span class="Other">=</span> <span class="Identifier">false</span><span class="Other">)</span><span class="Other">:</span> <span class="Other">(</span><span class="Identifier">int</span><span class="Other">,</span> <span class="Identifier">int</span><span class="Other">)</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma">
+    <span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">SQLError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
+<dd>
+
+<p>Retrieves queried status info. See <a class="reference external" href="https://www.sqlite.org/c3ref/c_dbstatus_options.html">https://www.sqlite.org/c3ref/c_dbstatus_options.html</a></p>
+<p><strong>Example:</strong></p>
+<pre class="listing"><span class="Keyword">const</span> <span class="Identifier">SQLITE_DBSTATUS_CACHE_USED</span> <span class="Operator">=</span> <span class="DecNumber">1</span>
+<span class="Identifier">echo</span> <span class="StringLit">&quot;current cache usage: &quot;</span><span class="Punctuation">,</span> <span class="Identifier">db</span><span class="Operator">.</span><span class="Identifier">getStatus</span><span class="Punctuation">(</span><span class="Identifier">SQLITE_DBSTATUS_CACHE_USED</span><span class="Punctuation">)</span><span class="Punctuation">[</span><span class="DecNumber">0</span><span class="Punctuation">]</span></pre>
+
+</dd>
 <a id="close,SQLiteral"></a>
-<dt><pre><span class="Keyword">proc</span> <a href="#close%2CSQLiteral"><span class="Identifier">close</span></a><span class="Other">(</span><span class="Identifier">db</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="sqliteral.html#SQLiteral"><span class="Identifier">SQLiteral</span></a><span class="Other">)</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
+<dt><pre><span class="Keyword">proc</span> <a href="#close%2CSQLiteral"><span class="Identifier">close</span></a><span class="Other">(</span><span class="Identifier">db</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="sqliteral.html#SQLiteral"><span class="Identifier">SQLiteral</span></a><span class="Other">)</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">SQLError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
 <dd>
 
 Closes the database.
@@ -1990,7 +2042,7 @@ Executes body with transactions locked (no transaction can proceed).
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br/>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2021-02-24 13:19:48 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2021-03-03 11:38:42 UTC</small>
       </div>
     </div>
   </div>
