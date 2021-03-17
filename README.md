@@ -5,33 +5,26 @@ Supports multi-threading, prepared statements, proper typing,
 zero-copy data paths, debugging, JSON, optimizing, backups, and more...
 
 ## Documentation
-[1.3.0](http://htmlpreview.github.io/?https://github.com/olliNiinivaara/SQLiteral/blob/master/doc/sqliteral130.html)
 
-[2.0.0](http://htmlpreview.github.io/?https://github.com/olliNiinivaara/SQLiteral/blob/master/doc/sqliteral200.html)
+http://olliNiinivaara.github.io/SQLiteral/
 
 
-## Installation (upgrade to 2.0.0 pre-release is recommended)
-1.3.0: `nimble install sqliteral`
+## Installation
 
-2.0.0: `nimble install sqliteral@#head`
+`nimble install sqliteral`
 
-## Change log
-
-**1.3.0 (2021-02-19) current release**
-* take backups concurrently
-* database open supports multiple schemas
-* partition states removed
-
-**2.0.0 pre-release (2021-03-03) current master**
-* thread-isolating data structures guarantee interference-free db operations
+## 2.0.0 Release notes (2021-03-17)
+* breaking API change: New prepareStatements() proc must be used
+* new thread-isolating data structures guarantee interference-free db operations
 * better support for experimental:views -based zero-copy strings
 * JSON helper functions, JSON in documentation example
-* breaking API change: New prepareStatements() proc must be used
-* Selected errors during schema migrations can ignored, such as creating duplicate column name
+* Selected errors during schema migrations can ignored
 * backup processes can be canceled
 * getStatus proc for https://www.sqlite.org/c3ref/c_dbstatus_options.html
+* getAsStrings -proc for getting all result rows as a sequence of strings
+* logger also checks that statements receive enough parameters
 
-## Example (version 2.0.0)
+## Example
 
 ```nim
 import sqliteral
