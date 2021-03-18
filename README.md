@@ -21,7 +21,7 @@ http://olliNiinivaara.github.io/SQLiteral/
 * Selected errors during schema migrations can ignored
 * backup processes can be canceled
 * getStatus proc for https://www.sqlite.org/c3ref/c_dbstatus_options.html
-* getAsStrings -proc for getting all result rows as a sequence of strings
+* getAsStrings -proc for getting all result columns as a sequence of strings
 * logger also checks that statements receive enough parameters
 
 ## Example
