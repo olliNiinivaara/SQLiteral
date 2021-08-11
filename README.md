@@ -13,16 +13,10 @@ http://olliNiinivaara.github.io/SQLiteral/
 
 `nimble install sqliteral`
 
-## 2.0.0 Release notes (2021-03-17)
-* breaking API change: New prepareStatements() proc must be used
-* new thread-isolating data structures guarantee interference-free db operations
-* better support for experimental:views -based zero-copy strings
-* JSON helper functions, JSON in documentation example
-* Selected errors during schema migrations can ignored
-* backup processes can be canceled
-* getStatus proc for https://www.sqlite.org/c3ref/c_dbstatus_options.html
-* getAsStrings -proc for getting all result columns as a sequence of strings
-* logger also checks that statements receive enough parameters
+## 2.0.1 Release notes (2021-08-11)
+* removed spurious debug echo
+* better logging
+* better example
 
 ## Example
 
