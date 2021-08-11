@@ -40,13 +40,16 @@ type SqlStatements = enum
   SelectAll = "SELECT count FROM Example"
 var db: SQLiteral
 
+proc operate() =
+  echo "count=",db.getTheInt(Select, 1)
+  db.transaction: db.exec(Increment, 1)
+  for row in db.rows(SelectAll): echo row.getInt(CountColumn)
+
 when not defined(release):
   db.setLogger(proc(db: SQLiteral, msg: string, code: int) = echo msg)
 
 db.openDatabase("example.db", Schema)
 db.prepareStatements(SqlStatements)
-echo "count=",db.getTheInt(Select, 1) 
-db.transaction: db.exec(Increment, 1)
-for row in db.rows(SelectAll): echo row.getInt(CountColumn)
-db.close
+operate()
+db.close()
 ```

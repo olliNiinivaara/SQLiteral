@@ -1,4 +1,4 @@
-const SQLiteralVersion* = "2.0.0"
+const SQLiteralVersion* = "2.0.1"
 
 # (C) Olli Niinivaara, 2020-2021
 # MIT Licensed
@@ -74,7 +74,8 @@ const SQLiteralVersion* = "2.0.0"
 ## consult sqliteral source code or `about()` proc for details.
 ## These can be turned off with `-d:disableSqliteoptions` option.
 ## 
-## 
+##
+
 
 when compiles((var x = 1; var vx: var int = x)):
   const ViewsAvailable = true
@@ -230,7 +231,6 @@ var emptystart = cast[ptr UncheckedArray[char]](addr emptytext[0])
 when compileOption("threads"):
   proc threadi*(db: SQLiteral): int = # public only for technical reasons
    let id = getThreadId()
-   echo db.threadindices
    for i in 0 ..< db.threadlen: (if db.threadindices[i] == id: return i)
    doAssert(false, "uninitialized thread - has prepareStatements been called on this thread?")
 else:
@@ -328,13 +328,16 @@ template log() =
   var replacement = 0
   while replacement < params.len:
     let position = logstring.find('?')
-    assert(position != -1, "too many params (" & $params.len & ") for: " & $statement)    
+    if (position == -1):
+      logstring = $params.len & "is too many params for: " & $statement
+      replacement = params.len
+      continue
     let param =
       if db.maxparamloggedlen < 1: $params[replacement]
       else: ($params[replacement]).substr(0, db.maxparamloggedlen - 1)
     logstring = logstring[0 .. position-1] & param & logstring.substr(position+1)
     replacement += 1
-  assert(logstring.find('?') == -1, $params.len & " is not enough params for: " & $statement)
+  if (logstring.find('?') != -1): logstring = $params.len & " is not enough params for: " & $statement
   db.loggerproc(db, logstring, 0)
 
 
