@@ -1,4 +1,4 @@
-const SQLiteralVersion* = "2.0.1"
+const SQLiteralVersion* = "2.0.2"
 
 # (C) Olli Niinivaara, 2020-2021
 # MIT Licensed
@@ -12,7 +12,7 @@ const SQLiteralVersion* = "2.0.1"
 ## .. code-block:: Nim
 ##  
 ##  # nim c --threads:on example
-##  #(works if sqlite compiled with JSON extensions)
+##  # (works if sqlite compiled with JSON extensions)
 ##  
 ##  # nim c -d:danger --gc:orc -d:staticSqlite --experimental:views --threads:on example
 ##  # (works if sqlite3.c in path)
@@ -20,46 +20,59 @@ const SQLiteralVersion* = "2.0.1"
 ##  import sqliteral, threadpool
 ##  from strutils import find
 ##  from os import sleep
-##   
+##     
 ##  const Schema = "CREATE TABLE IF NOT EXISTS Example(name TEXT NOT NULL, jsondata TEXT NOT NULL)"
+##    
 ##  
 ##  type SqlStatements = enum
 ##    Insert = """INSERT INTO Example (name, jsondata)
-##     VALUES (json_extract(?, '$.name'), json_extract(?, '$.data'))"""
+##    VALUES (json_extract(?, '$.name'), json_extract(?, '$.data'))"""
 ##    Count = "SELECT count(*) FROM Example"
 ##    Select = "SELECT json_extract(jsondata, '$.array') FROM Example"
-##  
+##    
 ##  let httprequest = """header BODY:{"name":"Alice", "data":{"info":"xxx", "array":["a","b","c"]}}"""
-##  
+##    
 ##  var 
 ##    db: SQLiteral
 ##    prepared {.threadvar.}: bool
+##    rowresult {.threadvar.}: string
 ##    ready: int
-##  
+##    
 ##  when not defined(release): db.setLogger(proc(db: SQLiteral, msg: string, code: int) = echo msg)
-##  
+##   
 ##  proc select() =
 ##    {.gcsafe.}:
-##      if not prepared: db.prepareStatements(SqlStatements)
-##      for row in db.rows(Select): stdout.write($row.getString(0) & '\n')
+##      if not prepared:
+##        db.prepareStatements(SqlStatements)
+##        rowresult = newstring(1000)
+##        prepared = true
+##      for row in db.rows(Select):
+##        rowresult.setLen(0)
+##        rowresult.add($getThreadId())
+##        rowresult.add(": ")
+##        rowresult.add($row.getString(0))
+##        rowresult.add('\n')
+##        stdout.write(rowresult)
 ##      discard ready.atomicInc
-##  
+##   
 ##  proc run() =
-##    db.openDatabase("example.db", Schema)
+##    db.openDatabase("ex.db", Schema)
 ##    defer: db.close()
 ##    db.prepareStatements(SqlStatements)
-##    if db.getTheInt(Count) < 1:
-##      let body = asText(httprequest, httprequest.find("BODY:") + 5, httprequest.len - 1)
-##      if not db.json_valid(body): quit(0)
-##      echo "inserting 10000 rows..."
-##      db.transaction:
+##    let body = asText(httprequest, httprequest.find("BODY:") + 5, httprequest.len - 1)
+##    if not db.json_valid(body): quit(0)
+##    
+##    echo "inserting 10000 rows..."
+##    db.transaction:
 ##        for i in 1 .. 10000: discard db.insert(Insert, body, body)
-##    else:
-##      for i in 1 .. 4: spawn(select())
-##      while (ready < 4): sleep(20)
-##      stdout.flushFile()
-##      echo "Selected 4 * ", db.getTheInt(Count), " rows"
-##  
+##    
+##    echo "10000 rows inserted. Press <Enter> to select all in 4 threads..."
+##    discard stdin.readChar()
+##    for i in 1 .. 4: spawn(select())
+##    while (ready < 4): sleep(20)
+##    stdout.flushFile()
+##    echo "Selected 4 * ", db.getTheInt(Count), " = " & $(4 * db.getTheInt(Count)) & " rows."
+##   
 ##  run()
 ##  
 ##
@@ -797,7 +810,10 @@ proc openDatabase*(db: var SQLiteral, dbname: string, schema: string, maxKbSize 
 
 proc createStatement(db: var SQLiteral, statement: enum) =
   let index = ord(statement)
-  if(unlikely) db.loggerproc != nil: db.loggerproc(db, $statement, -1)
+  if(unlikely) db.loggerproc != nil:
+    when compileOption("threads"):
+      if db.threadindices[0] == getThreadId(): db.loggerproc(db, $statement, -1)
+    else: db.loggerproc(db, $statement, -1)
   db.preparedstatements[db.threadlen][index] = prepareSql(db, ($statement).cstring)
 
 

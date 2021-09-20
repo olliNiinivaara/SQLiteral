@@ -147,7 +147,7 @@ function main() {
   <a class="reference reference-toplevel" href="#10" id="60">Consts</a>
   <ul class="simple simple-toc-section">
       <li><a class="reference" href="#SQLiteralVersion"
-    title="SQLiteralVersion = &quot;2.0.0&quot;">SQLiteralVersion</a></li>
+    title="SQLiteralVersion = &quot;2.0.2&quot;">SQLiteralVersion</a></li>
   <li><a class="reference" href="#MaxThreadSize"
     title="MaxThreadSize = 32">MaxThreadSize</a></li>
   <li><a class="reference" href="#MaxStatements"
@@ -438,7 +438,7 @@ function main() {
   <div id="tocRoot"></div>
   
   <p class="module-desc">A high level SQLite API with support for multi-threading, prepared statements, proper typing, zero-copy data paths, debugging, JSON, optimizing, backups, and more.
-<h1><a class="toc-backref" id="example-using-json-extensions" href="#example-using-json-extensions">Example (using JSON extensions)</a></h1><pre class="listing"><span class="Comment"># nim c --threads:on example</span>
+<h1><a class="toc-backref" id="example-using-json-extensions" href="#example-using-json-extensions">Example (using JSON extensions)</a></h1><pre class="listing"><span class="Comment">#nim c --threads:on example</span>
 <span class="Comment">#(works if sqlite compiled with JSON extensions)</span>
 
 <span class="Comment"># nim c -d:danger --gc:orc -d:staticSqlite --experimental:views --threads:on example</span>
@@ -450,9 +450,10 @@ function main() {
 
 <span class="Keyword">const</span> <span class="Identifier">Schema</span> <span class="Operator">=</span> <span class="StringLit">&quot;CREATE TABLE IF NOT EXISTS Example(name TEXT NOT NULL, jsondata TEXT NOT NULL)&quot;</span>
 
+
 <span class="Keyword">type</span> <span class="Identifier">SqlStatements</span> <span class="Operator">=</span> <span class="Keyword">enum</span>
   <span class="Identifier">Insert</span> <span class="Operator">=</span> <span class="LongStringLit">&quot;&quot;&quot;INSERT INTO Example (name, jsondata)
-   VALUES (json_extract(?, '$.name'), json_extract(?, '$.data'))&quot;&quot;&quot;</span>
+  VALUES (json_extract(?, '$.name'), json_extract(?, '$.data'))&quot;&quot;&quot;</span>
   <span class="Identifier">Count</span> <span class="Operator">=</span> <span class="StringLit">&quot;SELECT count(*) FROM Example&quot;</span>
   <span class="Identifier">Select</span> <span class="Operator">=</span> <span class="StringLit">&quot;SELECT json_extract(jsondata, '$.array') FROM Example&quot;</span>
 
@@ -461,31 +462,43 @@ function main() {
 <span class="Keyword">var</span>
   <span class="Identifier">db</span><span class="Punctuation">:</span> <span class="Identifier">SQLiteral</span>
   <span class="Identifier">prepared</span> <span class="Punctuation">{</span><span class="Operator">.</span><span class="Identifier">threadvar</span><span class="Operator">.</span><span class="Punctuation">}</span><span class="Punctuation">:</span> <span class="Identifier">bool</span>
+  <span class="Identifier">rowresult</span> <span class="Punctuation">{</span><span class="Operator">.</span><span class="Identifier">threadvar</span><span class="Operator">.</span><span class="Punctuation">}</span><span class="Punctuation">:</span> <span class="Identifier">string</span>
   <span class="Identifier">ready</span><span class="Punctuation">:</span> <span class="Identifier">int</span>
 
 <span class="Keyword">when</span> <span class="Keyword">not</span> <span class="Identifier">defined</span><span class="Punctuation">(</span><span class="Identifier">release</span><span class="Punctuation">)</span><span class="Punctuation">:</span> <span class="Identifier">db</span><span class="Operator">.</span><span class="Identifier">setLogger</span><span class="Punctuation">(</span><span class="Keyword">proc</span><span class="Punctuation">(</span><span class="Identifier">db</span><span class="Punctuation">:</span> <span class="Identifier">SQLiteral</span><span class="Punctuation">,</span> <span class="Identifier">msg</span><span class="Punctuation">:</span> <span class="Identifier">string</span><span class="Punctuation">,</span> <span class="Identifier">code</span><span class="Punctuation">:</span> <span class="Identifier">int</span><span class="Punctuation">)</span> <span class="Operator">=</span> <span class="Identifier">echo</span> <span class="Identifier">msg</span><span class="Punctuation">)</span>
 
 <span class="Keyword">proc</span> <span class="Identifier">select</span><span class="Punctuation">(</span><span class="Punctuation">)</span> <span class="Operator">=</span>
   <span class="Punctuation">{</span><span class="Operator">.</span><span class="Identifier">gcsafe</span><span class="Operator">.</span><span class="Punctuation">}</span><span class="Punctuation">:</span>
-    <span class="Keyword">if</span> <span class="Keyword">not</span> <span class="Identifier">prepared</span><span class="Punctuation">:</span> <span class="Identifier">db</span><span class="Operator">.</span><span class="Identifier">prepareStatements</span><span class="Punctuation">(</span><span class="Identifier">SqlStatements</span><span class="Punctuation">)</span>
-    <span class="Keyword">for</span> <span class="Identifier">row</span> <span class="Keyword">in</span> <span class="Identifier">db</span><span class="Operator">.</span><span class="Identifier">rows</span><span class="Punctuation">(</span><span class="Identifier">Select</span><span class="Punctuation">)</span><span class="Punctuation">:</span> <span class="Identifier">stdout</span><span class="Operator">.</span><span class="Identifier">write</span><span class="Punctuation">(</span><span class="Operator">$</span><span class="Identifier">row</span><span class="Operator">.</span><span class="Identifier">getString</span><span class="Punctuation">(</span><span class="DecNumber">0</span><span class="Punctuation">)</span> <span class="Operator">&amp;</span> <span class="CharLit">'\n'</span><span class="Punctuation">)</span>
+    <span class="Keyword">if</span> <span class="Keyword">not</span> <span class="Identifier">prepared</span><span class="Punctuation">:</span>
+      <span class="Identifier">db</span><span class="Operator">.</span><span class="Identifier">prepareStatements</span><span class="Punctuation">(</span><span class="Identifier">SqlStatements</span><span class="Punctuation">)</span>
+      <span class="Identifier">rowresult</span> <span class="Operator">=</span> <span class="Identifier">newstring</span><span class="Punctuation">(</span><span class="DecNumber">1000</span><span class="Punctuation">)</span>
+      <span class="Identifier">prepared</span> <span class="Operator">=</span> <span class="Identifier">true</span>
+    <span class="Keyword">for</span> <span class="Identifier">row</span> <span class="Keyword">in</span> <span class="Identifier">db</span><span class="Operator">.</span><span class="Identifier">rows</span><span class="Punctuation">(</span><span class="Identifier">Select</span><span class="Punctuation">)</span><span class="Punctuation">:</span>
+      <span class="Identifier">rowresult</span><span class="Operator">.</span><span class="Identifier">setLen</span><span class="Punctuation">(</span><span class="DecNumber">0</span><span class="Punctuation">)</span>
+      <span class="Identifier">rowresult</span><span class="Operator">.</span><span class="Identifier">add</span><span class="Punctuation">(</span><span class="Operator">$</span><span class="Identifier">getThreadId</span><span class="Punctuation">(</span><span class="Punctuation">)</span><span class="Punctuation">)</span>
+      <span class="Identifier">rowresult</span><span class="Operator">.</span><span class="Identifier">add</span><span class="Punctuation">(</span><span class="StringLit">&quot;: &quot;</span><span class="Punctuation">)</span>
+      <span class="Identifier">rowresult</span><span class="Operator">.</span><span class="Identifier">add</span><span class="Punctuation">(</span><span class="Operator">$</span><span class="Identifier">row</span><span class="Operator">.</span><span class="Identifier">getString</span><span class="Punctuation">(</span><span class="DecNumber">0</span><span class="Punctuation">)</span><span class="Punctuation">)</span>
+      <span class="Identifier">rowresult</span><span class="Operator">.</span><span class="Identifier">add</span><span class="Punctuation">(</span><span class="CharLit">'\n'</span><span class="Punctuation">)</span>
+      <span class="Identifier">stdout</span><span class="Operator">.</span><span class="Identifier">write</span><span class="Punctuation">(</span><span class="Identifier">rowresult</span><span class="Punctuation">)</span>
     <span class="Keyword">discard</span> <span class="Identifier">ready</span><span class="Operator">.</span><span class="Identifier">atomicInc</span>
 
 <span class="Keyword">proc</span> <span class="Identifier">run</span><span class="Punctuation">(</span><span class="Punctuation">)</span> <span class="Operator">=</span>
-  <span class="Identifier">db</span><span class="Operator">.</span><span class="Identifier">openDatabase</span><span class="Punctuation">(</span><span class="StringLit">&quot;example.db&quot;</span><span class="Punctuation">,</span> <span class="Identifier">Schema</span><span class="Punctuation">)</span>
+  <span class="Identifier">db</span><span class="Operator">.</span><span class="Identifier">openDatabase</span><span class="Punctuation">(</span><span class="StringLit">&quot;ex.db&quot;</span><span class="Punctuation">,</span> <span class="Identifier">Schema</span><span class="Punctuation">)</span>
   <span class="Keyword">defer</span><span class="Punctuation">:</span> <span class="Identifier">db</span><span class="Operator">.</span><span class="Identifier">close</span><span class="Punctuation">(</span><span class="Punctuation">)</span>
   <span class="Identifier">db</span><span class="Operator">.</span><span class="Identifier">prepareStatements</span><span class="Punctuation">(</span><span class="Identifier">SqlStatements</span><span class="Punctuation">)</span>
-  <span class="Keyword">if</span> <span class="Identifier">db</span><span class="Operator">.</span><span class="Identifier">getTheInt</span><span class="Punctuation">(</span><span class="Identifier">Count</span><span class="Punctuation">)</span> <span class="Operator">&lt;</span> <span class="DecNumber">1</span><span class="Punctuation">:</span>
-    <span class="Keyword">let</span> <span class="Identifier">body</span> <span class="Operator">=</span> <span class="Identifier">asText</span><span class="Punctuation">(</span><span class="Identifier">httprequest</span><span class="Punctuation">,</span> <span class="Identifier">httprequest</span><span class="Operator">.</span><span class="Identifier">find</span><span class="Punctuation">(</span><span class="StringLit">&quot;BODY:&quot;</span><span class="Punctuation">)</span> <span class="Operator">+</span> <span class="DecNumber">5</span><span class="Punctuation">,</span> <span class="Identifier">httprequest</span><span class="Operator">.</span><span class="Identifier">len</span> <span class="Operator">-</span> <span class="DecNumber">1</span><span class="Punctuation">)</span>
-    <span class="Keyword">if</span> <span class="Keyword">not</span> <span class="Identifier">db</span><span class="Operator">.</span><span class="Identifier">json_valid</span><span class="Punctuation">(</span><span class="Identifier">body</span><span class="Punctuation">)</span><span class="Punctuation">:</span> <span class="Identifier">quit</span><span class="Punctuation">(</span><span class="DecNumber">0</span><span class="Punctuation">)</span>
-    <span class="Identifier">echo</span> <span class="StringLit">&quot;inserting 10000 rows...&quot;</span>
-    <span class="Identifier">db</span><span class="Operator">.</span><span class="Identifier">transaction</span><span class="Punctuation">:</span>
+  <span class="Keyword">let</span> <span class="Identifier">body</span> <span class="Operator">=</span> <span class="Identifier">asText</span><span class="Punctuation">(</span><span class="Identifier">httprequest</span><span class="Punctuation">,</span> <span class="Identifier">httprequest</span><span class="Operator">.</span><span class="Identifier">find</span><span class="Punctuation">(</span><span class="StringLit">&quot;BODY:&quot;</span><span class="Punctuation">)</span> <span class="Operator">+</span> <span class="DecNumber">5</span><span class="Punctuation">,</span> <span class="Identifier">httprequest</span><span class="Operator">.</span><span class="Identifier">len</span> <span class="Operator">-</span> <span class="DecNumber">1</span><span class="Punctuation">)</span>
+  <span class="Keyword">if</span> <span class="Keyword">not</span> <span class="Identifier">db</span><span class="Operator">.</span><span class="Identifier">json_valid</span><span class="Punctuation">(</span><span class="Identifier">body</span><span class="Punctuation">)</span><span class="Punctuation">:</span> <span class="Identifier">quit</span><span class="Punctuation">(</span><span class="DecNumber">0</span><span class="Punctuation">)</span>
+  
+  <span class="Identifier">echo</span> <span class="StringLit">&quot;inserting 10000 rows...&quot;</span>
+  <span class="Identifier">db</span><span class="Operator">.</span><span class="Identifier">transaction</span><span class="Punctuation">:</span>
       <span class="Keyword">for</span> <span class="Identifier">i</span> <span class="Keyword">in</span> <span class="DecNumber">1</span> <span class="Operator">..</span> <span class="DecNumber">10000</span><span class="Punctuation">:</span> <span class="Keyword">discard</span> <span class="Identifier">db</span><span class="Operator">.</span><span class="Identifier">insert</span><span class="Punctuation">(</span><span class="Identifier">Insert</span><span class="Punctuation">,</span> <span class="Identifier">body</span><span class="Punctuation">,</span> <span class="Identifier">body</span><span class="Punctuation">)</span>
-  <span class="Keyword">else</span><span class="Punctuation">:</span>
-    <span class="Keyword">for</span> <span class="Identifier">i</span> <span class="Keyword">in</span> <span class="DecNumber">1</span> <span class="Operator">..</span> <span class="DecNumber">4</span><span class="Punctuation">:</span> <span class="Identifier">spawn</span><span class="Punctuation">(</span><span class="Identifier">select</span><span class="Punctuation">(</span><span class="Punctuation">)</span><span class="Punctuation">)</span>
-    <span class="Keyword">while</span> <span class="Punctuation">(</span><span class="Identifier">ready</span> <span class="Operator">&lt;</span> <span class="DecNumber">4</span><span class="Punctuation">)</span><span class="Punctuation">:</span> <span class="Identifier">sleep</span><span class="Punctuation">(</span><span class="DecNumber">20</span><span class="Punctuation">)</span>
-    <span class="Identifier">stdout</span><span class="Operator">.</span><span class="Identifier">flushFile</span><span class="Punctuation">(</span><span class="Punctuation">)</span>
-    <span class="Identifier">echo</span> <span class="StringLit">&quot;Selected 4 * &quot;</span><span class="Punctuation">,</span> <span class="Identifier">db</span><span class="Operator">.</span><span class="Identifier">getTheInt</span><span class="Punctuation">(</span><span class="Identifier">Count</span><span class="Punctuation">)</span><span class="Punctuation">,</span> <span class="StringLit">&quot; rows&quot;</span>
+  
+  <span class="Identifier">echo</span> <span class="StringLit">&quot;10000 rows inserted. Press &lt;Enter&gt; to select all in 4 threads...&quot;</span>
+  <span class="Keyword">discard</span> <span class="Identifier">stdin</span><span class="Operator">.</span><span class="Identifier">readChar</span><span class="Punctuation">(</span><span class="Punctuation">)</span>
+  <span class="Keyword">for</span> <span class="Identifier">i</span> <span class="Keyword">in</span> <span class="DecNumber">1</span> <span class="Operator">..</span> <span class="DecNumber">4</span><span class="Punctuation">:</span> <span class="Identifier">spawn</span><span class="Punctuation">(</span><span class="Identifier">select</span><span class="Punctuation">(</span><span class="Punctuation">)</span><span class="Punctuation">)</span>
+  <span class="Keyword">while</span> <span class="Punctuation">(</span><span class="Identifier">ready</span> <span class="Operator">&lt;</span> <span class="DecNumber">4</span><span class="Punctuation">)</span><span class="Punctuation">:</span> <span class="Identifier">sleep</span><span class="Punctuation">(</span><span class="DecNumber">20</span><span class="Punctuation">)</span>
+  <span class="Identifier">stdout</span><span class="Operator">.</span><span class="Identifier">flushFile</span><span class="Punctuation">(</span><span class="Punctuation">)</span>
+  <span class="Identifier">echo</span> <span class="StringLit">&quot;Selected 4 * &quot;</span><span class="Punctuation">,</span> <span class="Identifier">db</span><span class="Operator">.</span><span class="Identifier">getTheInt</span><span class="Punctuation">(</span><span class="Identifier">Count</span><span class="Punctuation">)</span><span class="Punctuation">,</span> <span class="StringLit">&quot; = &quot;</span> <span class="Operator">&amp;</span> <span class="Operator">$</span><span class="Punctuation">(</span><span class="DecNumber">4</span> <span class="Operator">*</span> <span class="Identifier">db</span><span class="Operator">.</span><span class="Identifier">getTheInt</span><span class="Punctuation">(</span><span class="Identifier">Count</span><span class="Punctuation">)</span><span class="Punctuation">)</span> <span class="Operator">&amp;</span> <span class="StringLit">&quot; rows.&quot;</span>
 
 <span class="Identifier">run</span><span class="Punctuation">(</span><span class="Punctuation">)</span></pre>
 <h1><a class="toc-backref" id="compiling-with-sqlite3dotc" href="#compiling-with-sqlite3dotc">Compiling with sqlite3.c</a></h1><p>First, sqlite3.c amalgamation must be on compiler search path.<br />You can extract it from a zip available at <a class="reference external" href="https://www.sqlite.org/download.html">https://www.sqlite.org/download.html</a>.<br />Then, <tt class="docutils literal"><span class="pre">-d:staticSqlite</span></tt>compiler option must be used.<br /></p><p>For your convenience, <tt class="docutils literal"><span class="pre">-d:staticSqlite</span></tt> triggers some useful SQLite compiler options, consult sqliteral source code or <tt class="docutils literal"><span class="pre">about()</span></tt> proc for details. These can be turned off with <tt class="docutils literal"><span class="pre">-d:disableSqliteoptions</span></tt> option.</p>
@@ -573,7 +586,7 @@ function main() {
 <h1><a class="toc-backref" href="#10">Consts</a></h1>
 <dl class="item">
 <a id="SQLiteralVersion"></a>
-<dt><pre><a href="sqliteral.html#SQLiteralVersion"><span class="Identifier">SQLiteralVersion</span></a> <span class="Other">=</span> <span class="StringLit">&quot;2.0.0&quot;</span></pre></dt>
+<dt><pre><a href="sqliteral.html#SQLiteralVersion"><span class="Identifier">SQLiteralVersion</span></a> <span class="Other">=</span> <span class="StringLit">&quot;2.0.2&quot;</span></pre></dt>
 <dd>
 
 
@@ -1158,7 +1171,7 @@ Executes <tt class="docutils literal"><span class="pre">body</span></tt> in betw
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br/>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2021-03-17 08:12:29 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2021-09-20 13:18:36 UTC</small>
       </div>
     </div>
   </div>
