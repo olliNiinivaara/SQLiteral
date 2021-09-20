@@ -13,10 +13,9 @@ http://olliNiinivaara.github.io/SQLiteral/
 
 `nimble install sqliteral`
 
-## 2.0.1 Release notes (2021-08-11)
-* removed spurious debug echo
-* better logging
-* better example
+## 2.0.2 Release notes (2021-09-20)
+* logs every statement preparation only once (instead of from every thread)
+* more realistic example
 
 ## Example
 
