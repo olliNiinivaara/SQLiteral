@@ -13,36 +13,29 @@ http://olliNiinivaara.github.io/SQLiteral/
 
 `nimble install sqliteral`
 
-## 2.0.2 Release notes (2021-09-20)
-* logs every statement preparation only once (instead of from every thread)
-* more realistic example
+## 3.0.0 Release notes (2021-11-16)
+* new implementation for Text values (see various toDb -procs)
+* nimble file typo fix
 
 ## Example
 
 ```nim
 import sqliteral
-const Schema = """
-  CREATE TABLE IF NOT EXISTS Example(count INTEGER NOT NULL);
-  INSERT INTO Example(rowid, count) VALUES(1, 1)
-   ON CONFLICT(rowid) DO UPDATE SET count=count+100
-  """
-const CountColumn = 0
+const Schema = "CREATE TABLE IF NOT EXISTS Example(string TEXT NOT NULL)"
 type SqlStatements = enum
-  Increment = "UPDATE Example SET count=count+1 WHERE rowid = ?"
-  Select = "SELECT count FROM Example WHERE rowid = ?"
-  SelectAll = "SELECT count FROM Example"
+  Upsert = """INSERT INTO Example(rowid, string) VALUES(1, ?)
+   ON CONFLICT(rowid) DO UPDATE SET string = ?"""
+  SelectAll = "SELECT string FROM Example"
 var db: SQLiteral
 
-proc operate() =
-  echo "count=",db.getTheInt(Select, 1)
-  db.transaction: db.exec(Increment, 1)
-  for row in db.rows(SelectAll): echo row.getInt(CountColumn)
-
-when not defined(release):
-  db.setLogger(proc(db: SQLiteral, msg: string, code: int) = echo msg)
+proc operate(i: string) =
+  let view: DbValue = i.toDb(3, 7) # zero-copy view into string
+  db.transaction: db.exec(Upsert, view, view)
+  for row in db.rows(SelectAll): echo row.getCString(0)
 
 db.openDatabase("example.db", Schema)
 db.prepareStatements(SqlStatements)
-operate()
+var input = "012INPUT89"
+operate(input)
 db.close()
 ```

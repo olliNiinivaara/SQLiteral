@@ -1,4 +1,4 @@
-const SQLiteralVersion* = "2.0.2"
+const SQLiteralVersion* = "3.0.0"
 
 # (C) Olli Niinivaara, 2020-2021
 # MIT Licensed
@@ -11,60 +11,49 @@ const SQLiteralVersion* = "2.0.2"
 ##
 ## .. code-block:: Nim
 ##  
-##  # nim c --threads:on example
-##  # (works if sqlite compiled with JSON extensions)
-##  
-##  # nim c -d:danger --gc:orc -d:staticSqlite --experimental:views --threads:on example
-##  # (works if sqlite3.c in path)
+##  # nim r --threads:on example
 ##  
 ##  import sqliteral, threadpool
 ##  from strutils import find
 ##  from os import sleep
-##     
+##  
 ##  const Schema = "CREATE TABLE IF NOT EXISTS Example(name TEXT NOT NULL, jsondata TEXT NOT NULL)"
-##    
 ##  
 ##  type SqlStatements = enum
 ##    Insert = """INSERT INTO Example (name, jsondata)
 ##    VALUES (json_extract(?, '$.name'), json_extract(?, '$.data'))"""
 ##    Count = "SELECT count(*) FROM Example"
 ##    Select = "SELECT json_extract(jsondata, '$.array') FROM Example"
-##    
+##  
 ##  let httprequest = """header BODY:{"name":"Alice", "data":{"info":"xxx", "array":["a","b","c"]}}"""
-##    
-##  var 
+##  
+##  var
 ##    db: SQLiteral
 ##    prepared {.threadvar.}: bool
-##    rowresult {.threadvar.}: string
 ##    ready: int
-##    
+##  
 ##  when not defined(release): db.setLogger(proc(db: SQLiteral, msg: string, code: int) = echo msg)
-##   
+##  
 ##  proc select() =
 ##    {.gcsafe.}:
 ##      if not prepared:
 ##        db.prepareStatements(SqlStatements)
-##        rowresult = newstring(1000)
 ##        prepared = true
 ##      for row in db.rows(Select):
-##        rowresult.setLen(0)
-##        rowresult.add($getThreadId())
-##        rowresult.add(": ")
-##        rowresult.add($row.getString(0))
-##        rowresult.add('\n')
-##        stdout.write(rowresult)
+##        stdout.write(row.getCString(0))
+##        stdout.write('\n')
 ##      discard ready.atomicInc
-##   
+##  
 ##  proc run() =
 ##    db.openDatabase("ex.db", Schema)
 ##    defer: db.close()
 ##    db.prepareStatements(SqlStatements)
-##    let body = asText(httprequest, httprequest.find("BODY:") + 5, httprequest.len - 1)
+##    let body = httprequest.toDb(httprequest.find("BODY:") + 5, httprequest.len - 1)
 ##    if not db.json_valid(body): quit(0)
 ##    
 ##    echo "inserting 10000 rows..."
 ##    db.transaction:
-##        for i in 1 .. 10000: discard db.insert(Insert, body, body)
+##      for i in 1 .. 10000: discard db.insert(Insert, body, body)
 ##    
 ##    echo "10000 rows inserted. Press <Enter> to select all in 4 threads..."
 ##    discard stdin.readChar()
@@ -72,10 +61,9 @@ const SQLiteralVersion* = "2.0.2"
 ##    while (ready < 4): sleep(20)
 ##    stdout.flushFile()
 ##    echo "Selected 4 * ", db.getTheInt(Count), " = " & $(4 * db.getTheInt(Count)) & " rows."
-##   
+##  
 ##  run()
 ##  
-##
 ## Compiling with sqlite3.c
 ## ========================
 ## 
@@ -86,14 +74,7 @@ const SQLiteralVersion* = "2.0.2"
 ## For your convenience, `-d:staticSqlite` triggers some useful SQLite compiler options,
 ## consult sqliteral source code or `about()` proc for details.
 ## These can be turned off with `-d:disableSqliteoptions` option.
-## 
 ##
-
-
-when compiles((var x = 1; var vx: var int = x)):
-  const ViewsAvailable = true
-else:
-  const ViewsAvailable = false
 
 when defined(staticSqlite):
   when compileOption("threads"): {.passL: "-lpthread".}
@@ -151,93 +132,22 @@ type
   DbValueKind = enum
     sqliteInteger,
     sqliteReal,
-    sqliteTextview,
-    sqliteTextuncheckedarray,
+    sqliteText,
     sqliteBlob
   
-  Text* = tuple[data: ptr UncheckedArray[char], len: int32]
-    ## To avoid copying strings, SQLiteral offers Text as a zero-copy view to a slice of existing string
-    ##
-    ## Compile with --experimental:views to use the new language-supported zero-copy views instead (when they work).
-    ## Text will be removed when views become officially supported in Nim...
-    ## 
-    ## **Example:**
-    ##
-    ## .. code-block:: Nim
-    ##
-    ##    var buffer = """{"sentence": "Call me Ishmael"}"""
-    ##    let value = asText(buffer, buffer.find(" \"")+2, buffer.find("\"}")-1)
-    ##    assert value.equals("Call me Ishmael")
-    ##    db.exec(Update, value, rowid)
-    
-when ViewsAvailable:
-  type
-    DbValue* = object
-      ## | Represents a value in a SQLite database.
-      ## | https://www.sqlite.org/datatype3.html
-      ## | NULL values are not possible to avoid the billion-dollar mistake.
-      case kind*: DbValueKind
-      of sqliteInteger:
-        intVal*: int64
-      of sqliteReal:
-        floatVal*: float64
-      of sqliteTextview:
-        textVal*: openArray[char]
-      of sqliteTextuncheckedarray:
-        uncheckedarraytextVal*: Text
-          ## --experimental:views also offers openArray[char].
-          ## (nimdoc does not support documenting these experimental features)
-      of sqliteBlob:
-        blobVal*: seq[byte] # TODO: openArray[byte]
-else:
-  type
-    DbValue* = object
-      ## | Represents a value in a SQLite database.
-      ## | https://www.sqlite.org/datatype3.html
-      ## | NULL values are not possible to avoid the billion-dollar mistake.
-      case kind*: DbValueKind
-      of sqliteInteger:
-        intVal*: int64
-      of sqliteReal:
-        floatVal*: float64
-      of sqliteTextview:
-        textVal*: void ## not yer in use!
-      of sqliteTextuncheckedarray:
-        uncheckedarraytextVal*: Text
-      of sqliteBlob:
-        blobVal*: seq[byte]
-
-#----------------------------------------------------------
-
-proc asText*(fromstring: string, first: int, last: int): Text =
-  ## Creates a zero-copy view to a substring of existing string
-  doAssert(last < fromstring.len)
-  doAssert(last < int32.high)
-  (cast[ptr UncheckedArray[char]](fromstring[first].unsafeAddr), (last - first + 1).int32)
-
-proc asText*(fromstring: ptr string, first: int, last: int): Text =
-  ## Creates a zero-copy view to a substring of existing string
-  doAssert(first < fromstring[].len)
-  doAssert(last < fromstring[].len)
-  doAssert(last < int32.high)
-  (cast[ptr UncheckedArray[char]](fromstring[first].unsafeAddr), (last - first + 1).int32)
-
-proc equals*(text: Text, str: string): bool {.inline.} =
-  if text.len != str.len: return false
-  for i in 0 ..< text.len:
-    if text.data[i] != str[i]: return false
-  return true
-
-proc `$`*(text: Text): string =
-  for i in 0 ..< text.len: result.add(text.data[i])
-
-proc len*(text: Text): int {.inline.} = text.len
-
-proc substr*(text: Text, start: int, last: int): string =
-  for i in start ..< last: result.add(text.data[i])
-
-var emptytext = "X"
-var emptystart = cast[ptr UncheckedArray[char]](addr emptytext[0])
+  DbValue* = object
+    ## | Represents a value in a SQLite database.
+    ## | https://www.sqlite.org/datatype3.html
+    ## | NULL values are not possible to avoid the billion-dollar mistake.
+    case kind*: DbValueKind
+    of sqliteInteger:
+      intVal*: int64
+    of sqliteReal:
+      floatVal*: float64
+    of sqliteText:
+      textVal*: tuple[chararray: cstring, len: int32]
+    of sqliteBlob:
+      blobVal*: seq[byte] # TODO: openArray[byte]
 
 #----------------------------------------------------------
 
@@ -259,25 +169,24 @@ template checkRc*(db: SQLiteral, resultcode: int) =
     raise SQLError(msg: db.dbname & " " & errormsg, rescode: resultcode)
 
 
-when ViewsAvailable:
-  proc toDb*(val: string): DbValue {.inline.} =
-    DbValue(kind: sqliteTextview, textVal: toOpenArray(val, 0, val.high))
-  
-  proc toDb*(val: openArray[char]): DbValue {.inline.} =
-    #DbValue(kind: sqliteText, textVal: val)
-    # nim error: incompatible types when assigning to type ‘tyOpenArray__g7UvpSI7wiag75QHJKQ1sQ’ {aka ‘struct <anonymous>’} from type ‘NIM_CHAR *’ {aka ‘char *’}
-    DbValue(kind: sqliteTextuncheckedarray, uncheckedarraytextVal: (cast[ptr UncheckedArray[char]](val[0].unsafeAddr), val.len.int32))
-else:
-  proc toDb*(val: string): DbValue {.inline.} =
-    if val.len == 0:
-      DbValue(kind: sqliteTextuncheckedarray, uncheckedarraytextVal: (emptystart , 0.int32))
-    else:
-      DbValue(kind: sqliteTextuncheckedarray, uncheckedarraytextVal: (cast[ptr UncheckedArray[char]](val[0].unsafeAddr), val.len.int32))
+proc toDb*(val: cstring, len = -1): DbValue {.inline.} =
+  if len == -1: DbValue(kind: sqliteText, textVal: (val, int32(val.len())))
+  else: DbValue(kind: sqliteText, textVal: (val, int32(len)))
 
+proc toDb*(val: cstring, first, last: int): DbValue {.inline.} =
+  DbValue(kind: sqliteText, textVal: (cast[cstring](unsafeAddr(val[first])), int32(1 + last - first)))
 
-proc toDb*(val: Text): DbValue {.inline.} =
-  if val[1] < 0 or val[1] > high(int32):  raise SQLError(msg: "Text weird len: " & $val[1])
-  DbValue(kind: sqliteTextuncheckedarray, uncheckedarraytextVal: val)
+proc toDb*(val: string, len = -1): DbValue {.inline.} =
+  if len == -1: DbValue(kind: sqliteText, textVal: (cstring(val), int32(val.len())))
+  else: DbValue(kind: sqliteText, textVal: (cstring(val), int32(len)))
+
+proc toDb*(val: string, first, last: int): DbValue {.inline.} =
+  DbValue(kind: sqliteText, textVal: (cast[cstring](unsafeAddr(val[first])), int32(1 + last - first)))
+
+proc toDb*(val: openArray[char], len = -1): DbValue {.inline.} =
+  if len == -1: DbValue(kind: sqliteText, textVal: (cstring(unsafeAddr val[0]), int32(val.len())))
+  else: DbValue(kind: sqliteText, textVal: (cstring(unsafeAddr val[0]), int32(len)))
+
 
 proc toDb*[T: Ordinal](val: T): DbValue {.inline.} = DbValue(kind: sqliteInteger, intVal: val.int64)
 
@@ -288,52 +197,25 @@ proc toDb*(val: seq[byte]): DbValue {.inline.} = DbValue(kind: sqliteBlob, blobV
 proc toDb*[T: DbValue](val: T): DbValue {.inline.} = val
 
 
-when ViewsAvailable:
-  proc `$`*[T: DbValue](val: T): string {.inline.} = 
-    case val.kind
-    of sqliteInteger: $val.intval
-    of sqliteReal: $val.floatVal
-    of sqliteTextview: $val.textVal
-    of sqliteTextuncheckedarray: $val.uncheckedarraytextVal
-    of sqliteBlob: cast[string](val.blobVal)
-else:
-  proc `$`*[T: DbValue](val: T): string {.inline.} = 
-    case val.kind
-    of sqliteInteger: $val.intval
-    of sqliteReal: $val.floatVal
-    of sqliteTextview: "{.fatal: not available}"
-    of sqliteTextuncheckedarray: $val.uncheckedarraytextVal
-    of sqliteBlob: cast[string](val.blobVal)
+proc `$`*[T: DbValue](val: T): string {.inline.} = 
+  case val.kind
+  of sqliteInteger: $val.intval
+  of sqliteReal: $val.floatVal
+  of sqliteText: ($val.textVal.chararray)[0 .. val.textVal.len - 1]
+  of sqliteBlob: cast[string](val.blobVal)
 
 
-when ViewsAvailable:
-  proc bindParams*(sql: PStmt, params: varargs[DbValue]): int {.inline.} =
-    var idx = 1.int32
-    for value in params:
-      result =
-        case value.kind
-        of sqliteInteger: bind_int64(sql, idx, value.intval)
-        of sqliteReal: bind_double(sql, idx, value.floatVal)
-        of sqliteTextview: bind_text(sql, idx, cstring(unsafeAddr value.textVal[0]), value.textVal.len().int32, SQLITE_STATIC)
-        of sqliteTextuncheckedarray: bind_text(sql, idx, value.uncheckedarraytextVal[0], value.uncheckedarraytextVal[1].int32, SQLITE_STATIC)
-        of sqliteBlob: bind_blob(sql, idx.int32, cast[string](value.blobVal).cstring,
-         value.blobVal.len.int32 , SQLITE_STATIC)
-      if result != SQLITE_OK: return
-      idx.inc
-else:
-  proc bindParams*(sql: PStmt, params: varargs[DbValue]): int {.inline.} =
-    var idx = 1.int32
-    for value in params:
-      result =
-        case value.kind
-        of sqliteInteger: bind_int64(sql, idx, value.intval)
-        of sqliteReal: bind_double(sql, idx, value.floatVal)
-        of sqliteTextview: -1 #{.fatal: "not available"}
-        of sqliteTextuncheckedarray: bind_text(sql, idx, value.uncheckedarraytextVal[0], value.uncheckedarraytextVal[1].int32, SQLITE_STATIC)
-        of sqliteBlob: bind_blob(sql, idx.int32, cast[string](value.blobVal).cstring,
-         value.blobVal.len.int32 , SQLITE_STATIC)
-      if result != SQLITE_OK: return
-      idx.inc
+proc bindParams*(sql: PStmt, params: varargs[DbValue]): int {.inline.} =
+  var idx = 1.int32
+  for value in params:
+    result =
+      case value.kind
+      of sqliteInteger: bind_int64(sql, idx, value.intval)
+      of sqliteReal: bind_double(sql, idx, value.floatVal)
+      of sqliteText: bind_text(sql, idx, value.textVal.chararray, value.textVal.len, SQLITE_STATIC)
+      of sqliteBlob: bind_blob(sql, idx.int32, cast[string](value.blobVal).cstring, value.blobVal.len.int32, SQLITE_STATIC)
+    if result != SQLITE_OK: return
+    idx.inc
 
 
 template log() =
@@ -350,7 +232,7 @@ template log() =
       else: ($params[replacement]).substr(0, db.maxparamloggedlen - 1)
     logstring = logstring[0 .. position-1] & param & logstring.substr(position+1)
     replacement += 1
-  if (logstring.find('?') != -1): logstring = $params.len & " is not enough params for: " & $statement
+  if (logstring.find('?') != -1): logstring &= " (some params missing)"
   db.loggerproc(db, logstring, 0)
 
 
