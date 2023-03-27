@@ -13,9 +13,8 @@ http://olliNiinivaara.github.io/SQLiteral/
 
 `nimble install sqliteral`
 
-## 3.0.0 Release notes (2021-11-16)
-* new implementation for Text values (see various toDb -procs)
-* nimble file typo fix
+## 3.0.1 Release notes (2023-03-27)
+* catching CatchableError instead of Exception in transaction template
 
 ## Example
 

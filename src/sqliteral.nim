@@ -532,7 +532,7 @@ template transaction*(db: var SQLiteral, body: untyped) =
     db.intransaction = true
     if(unlikely) db.loggerproc != nil: db.loggerproc(db, "--- BEGIN TRANSACTION", 0)
     try: body
-    except Exception as ex:
+    except CatchableError as ex:
       exec(db, db.Rollback)
       if(unlikely) db.loggerproc != nil: db.loggerproc(db, "--- ROLLBACK", 0)
       db.intransaction = false
