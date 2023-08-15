@@ -158,7 +158,7 @@ when compileOption("threads"):
   proc threadi*(db: SQLiteral): int = # public only for technical reasons
    let id = getThreadId()
    for i in 0 ..< db.threadlen: (if db.threadindices[i] == id: return i)
-   doAssert(false, "uninitialized thread - has prepareStatements been called on this thread?")
+   raiseAssert "uninitialized thread - has prepareStatements been called on this thread?"
 else:
   template threadi*(db: SQLiteral): int = 0
 
@@ -202,7 +202,7 @@ proc toDb*[T: DbValue](val: T): DbValue {.inline.} = val
 
 proc `$`*[T: DbValue](val: T): string {.inline.} = 
   case val.kind
-  of sqliteInteger: $val.intval
+  of sqliteInteger: $val.intVal
   of sqliteReal: $val.floatVal
   of sqliteText: ($val.textVal.chararray)[0 .. val.textVal.len - 1]
   of sqliteBlob: cast[string](val.blobVal)
@@ -213,7 +213,7 @@ proc bindParams*(sql: PStmt, params: varargs[DbValue]): int {.inline.} =
   for value in params:
     result =
       case value.kind
-      of sqliteInteger: bind_int64(sql, idx, value.intval)
+      of sqliteInteger: bind_int64(sql, idx, value.intVal)
       of sqliteReal: bind_double(sql, idx, value.floatVal)
       of sqliteText: bind_text(sql, idx, value.textVal.chararray, value.textVal.len, SQLITE_STATIC)
       of sqliteBlob: bind_blob(sql, idx.int32, cast[string](value.blobVal).cstring, value.blobVal.len.int32, SQLITE_STATIC)
