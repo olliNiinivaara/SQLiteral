@@ -86,7 +86,10 @@ when not defined(disableSqliteoptions):
   when defined(danger):
     {.passC: "-DSQLITE_USE_ALLOCA -DSQLITE_MAX_EXPR_DEPTH=0".}
 
-import sqlite3
+when NimMajor == 2:
+  import db_connector/sqlite3
+else:
+  import std/sqlite3
 export PStmt, errmsg, reset, step, finalize, SQLITE_ROW
 import locks
 from os import getFileSize
