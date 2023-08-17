@@ -828,6 +828,9 @@ proc cancelBackup*(db: var SQLiteral, backupdb: Psqlite3, backuphandle: PSqlite3
   if db.loggerproc != nil: db.loggerproc(db, "backup canceled", 0)
   
 
+proc inMemory(db: SQLiteral): bool =
+  db.dbname == ":memory:"
+
 proc about*(db: SQLiteral) =
   ## Echoes some info about the database.
   echo ""
@@ -841,11 +844,12 @@ proc about*(db: SQLiteral) =
   echo "Pagesize=", $db.getTheInt("PRAGMA page_size")
   echo "WALautocheckpoint=", $db.getTheInt("PRAGMA wal_autocheckpoint")
   if db.preparedstatements.len > 0: echo "Preparedstatements=", $(db.preparedstatements[0].len)
-  let filesize = getFileSize(db.dbname)
-  echo "Filesize=", filesize
-  if db.maxsize > 0:
-    echo "Maxsize=", db.maxsize * 1024
-    echo "Sizeused=", (filesize div ((db.maxsize.float * 10.24).int)), "%"
+  if not db.inMemory:
+    let filesize = getFileSize(db.dbname)
+    echo "Filesize=", filesize
+    if db.maxsize > 0:
+      echo "Maxsize=", db.maxsize * 1024
+      echo "Sizeused=", (filesize div ((db.maxsize.float * 10.24).int)), "%"
   echo ""
 
 
