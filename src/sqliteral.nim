@@ -125,6 +125,7 @@ type
     laststatementindex: int
     internalstatements: array[MaxThreadSize, array[ord(Jsontree)+1, PStmt]]
     transactionlock: Lock
+    preparelock: Lock
     loggerproc: proc(sqliteral: SQLiteral, statement: string, errorcode: int) {.gcsafe, raises: [].}
     oncommitproc: proc(sqliteral: SQLiteral) {.gcsafe, raises: [].}
     maxparamloggedlen: int
@@ -659,6 +660,7 @@ proc openDatabase*(db: var SQLiteral, dbname: string, schemas: openArray[string]
   ## 
   doAssert dbname != ""
   initLock(db.transactionlock)
+  initLock(db.preparelock)
   db.dbname = dbname
   db.checkRc(open(dbname, db.sqlite))
  
@@ -702,14 +704,11 @@ proc createStatement(db: var SQLiteral, statement: enum) =
   db.preparedstatements[db.threadlen][index] = prepareSql(db, ($statement).cstring)
 
 
-var preparelock: Lock
-initLock(preparelock)
-
 proc prepareStatements*(db: var SQLiteral, Statements: typedesc[enum]) =
   ## Prepares the statements given as enum parameter.
   ## Call this exactly once from every thread that is going to access the database.
   ## Main example shows how this "exactly once"-requirement can be achieved with a boolean threadvar.
-  withLock(preparelock):
+  withLock(db.preparelock):
     when compileOption("threads"): db.threadindices[db.threadlen] = getThreadId()
     else: db.threadindices[db.threadlen] = 0
     for v in low(Statements) .. high(Statements): db.createStatement(v)
