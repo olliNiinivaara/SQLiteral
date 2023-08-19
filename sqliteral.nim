@@ -1,6 +1,7 @@
-const SQLiteralVersion* = "3.0.0"
+const SQLiteralVersion* = "4.0.0"
+static: doAssert(compileOption("threads"))
 
-# (C) Olli Niinivaara, 2020-2021
+# (C) Olli Niinivaara, 2020-2023
 # MIT Licensed
 
 ## A high level SQLite API with support for multi-threading, prepared statements,
@@ -11,13 +12,12 @@ const SQLiteralVersion* = "3.0.0"
 ##
 ## .. code-block:: Nim
 ##  
-##  # nim r --threads:on example
 ##  
 ##  import sqliteral, threadpool
 ##  from strutils import find
 ##  from os import sleep
 ##  
-##  const Schema = "CREATE TABLE IF NOT EXISTS Example(name TEXT NOT NULL, jsondata TEXT NOT NULL)"
+##  const Schema = "CREATE TABLE IF NOT EXISTS Example(name TEXT NOT NULL, jsondata TEXT NOT NULL) STRICT"
 ##  
 ##  type SqlStatements = enum
 ##    Insert = """INSERT INTO Example (name, jsondata)
@@ -42,6 +42,7 @@ const SQLiteralVersion* = "3.0.0"
 ##      for row in db.rows(Select):
 ##        stdout.write(row.getCString(0))
 ##        stdout.write('\n')
+##      finalizeStatements()
 ##      discard ready.atomicInc
 ##  
 ##  proc run() =
@@ -76,9 +77,19 @@ const SQLiteralVersion* = "3.0.0"
 ## These can be turned off with `-d:disableSqliteoptions` option.
 ##
 
-when defined(staticSqlite):
-  when compileOption("threads"): {.passL: "-lpthread".}
-  else: {.passC: "-DSQLITE_THREADSAFE=0".}
+when defined(staticSqlite): {.passL: "-lpthread".}
+else:
+  when defined(windows):
+    when defined(nimOldDlls):
+      const Lib = "sqlite3.dll"
+    elif defined(cpu64):
+      const Lib = "sqlite3_64.dll"
+    else:
+      const Lib = "sqlite3_32.dll"
+  elif defined(macosx):
+    const Lib = "libsqlite3(|.0).dylib"
+  else:
+    const Lib = "libsqlite3.so(|.0)"
 
 when not defined(disableSqliteoptions):
   {.passC: "-DSQLITE_DQS=0 -DSQLITE_OMIT_DEPRECATED -DSQLITE_OMIT_SHARED_CACHE -DSQLITE_LIKE_DOESNT_MATCH_BLOBS".}
@@ -96,9 +107,11 @@ from os import getFileSize
 from strutils import strip, split, contains, replace
 
 const
-  MaxThreadSize* {.intdefine.} = 32
-  MaxStatements* {.intdefine.} = 100
+  MaxStatements* {.intdefine.} = 200
     ## Compile time define pragma that limits amount of prepared statements
+  MaxDatabases* {.intdefine.} = 2
+    ## Compile time define pragma that limits amount of databases
+    
   
 type
   SQLError* = ref object of CatchableError
@@ -116,16 +129,11 @@ type
     dbname*: string
     inreadonlymode*: bool
     backupsinprogress*: int
+    index: int
     intransaction: bool
     walmode: bool 
     maxsize: int
-    threadindices: array[MaxThreadSize, int]
-    threadlen: int
-    preparedstatements: array[MaxThreadSize, array[MaxStatements, PStmt]]
-    laststatementindex: int
-    internalstatements: array[MaxThreadSize, array[ord(Jsontree)+1, PStmt]]
     transactionlock: Lock
-    preparelock: Lock
     loggerproc: proc(sqliteral: SQLiteral, statement: string, errorcode: int) {.gcsafe, raises: [].}
     oncommitproc: proc(sqliteral: SQLiteral) {.gcsafe, raises: [].}
     maxparamloggedlen: int
@@ -153,19 +161,30 @@ type
     of sqliteBlob:
       blobVal*: seq[byte] # TODO: openArray[byte]
 
-#----------------------------------------------------------
+  DestructorTriggerer = object
 
-when compileOption("threads"):
-  proc threadi*(db: SQLiteral): int = # public only for technical reasons
-   let id = getThreadId()
-   for i in 0 ..< db.threadlen: (if db.threadindices[i] == id: return i)
-   raiseAssert "uninitialized thread - has prepareStatements been called on this thread?"
-else:
-  template threadi*(db: SQLiteral): int = 0
+
+const InternalStatementCount = ord(JSontree) + 1
+
+var
+  openlock: Lock
+  nextdbindex = 0
+  preparedstatements {.threadvar.} : array[MaxDatabases * MaxStatements, PStmt]
+  internalstatements {.threadvar.} : array[MaxDatabases * InternalStatementCount, PStmt]
+  destructortriggerer {.threadvar.}: ref DestructorTriggerer
+
+initLock(openlock)
+
+
+proc `=destroy`(x: DestructorTriggerer) =
+  for i in 0 .. preparedstatements.high:
+    if preparedstatements[i] != nil: discard preparedstatements[i].finalize()
+  for i in 0 .. internalstatements.high:
+    discard internalstatements[i].finalize()
 
 
 template checkRc*(db: SQLiteral, resultcode: int) =
-  ## | Raises SQLError if resultcode notin [SQLITE_OK, SQLITE_ROW, SQLITE_DONE]
+  ## | Raises SQLError if resultcode notin SQLITE_OK, SQLITE_ROW, SQLITE_DONE
   ## | https://www.sqlite.org/rescode.html
   if resultcode notin [SQLITE_OK, SQLITE_ROW, SQLITE_DONE]:
     let errormsg = $errmsg(db.sqlite)
@@ -187,10 +206,11 @@ proc toDb*(val: string, len = -1): DbValue {.inline.} =
 proc toDb*(val: string, first, last: int): DbValue {.inline.} =
   DbValue(kind: sqliteText, textVal: (cast[cstring](unsafeAddr(val[first])), int32(1 + last - first)))
 
+{.warning[PtrToCstringConv]:off.}
 proc toDb*(val: openArray[char], len = -1): DbValue {.inline.} =
   if len == -1: DbValue(kind: sqliteText, textVal: (cstring(unsafeAddr val[0]), int32(val.len())))
   else: DbValue(kind: sqliteText, textVal: (cstring(unsafeAddr val[0]), int32(len)))
-
+{.warning[PtrToCstringConv]:on.}
 
 proc toDb*[T: Ordinal](val: T): DbValue {.inline.} = DbValue(kind: sqliteInteger, intVal: val.int64)
 
@@ -285,7 +305,7 @@ proc getAsStrings*(prepared: PStmt): seq[string] =
 iterator rows*(db: SQLiteral, statement: enum, params: varargs[DbValue, toDb]): PStmt =
   ## Iterates over the query results
   if(unlikely) db.loggerproc != nil: log()
-  let s = db.preparedstatements[threadi(db)][ord(statement)]
+  let s = preparedstatements[db.index * MaxStatements + ord(statement)]
   checkRc(db, bindParams(s, params))
   defer: discard sqlite3.reset(s)
   while step(s) == SQLITE_ROW: yield s
@@ -301,9 +321,7 @@ iterator rows*(db: SQLiteral, pstatement: Pstmt, params: varargs[DbValue, toDb])
 
 proc prepareSql*(db: SQLiteral, sql: cstring): PStmt {.inline.} =
   ## Prepares a cstring into an executable statement
-  # nim 1.2 regression workaround, see https://github.com/nim-lang/Nim/issues/13859
-  let len = sql.len.float32
-  checkRc(db, prepare_v2(db.sqlite, sql, len.cint, result, nil))
+  checkRc(db, prepare_v2(db.sqlite, sql, sql.len.cint, result, nil))
   return result
 
 
@@ -312,7 +330,7 @@ proc getTheInt*(db: SQLiteral, statement: enum, params: varargs[DbValue, toDb]):
   ## | If query does not return any rows, returns -2147483647 (low(int32) + 1).
   ## | Automatically resets the statement.
   if(unlikely) db.loggerproc != nil: log()
-  let s = db.preparedstatements[threadi(db)][ord(statement)]
+  let s = preparedstatements[db.index * MaxStatements + ord(statement)]
   checkRc(db, bindParams(s, params))
   defer: discard sqlite3.reset(s)
   if step(s) == SQLITE_ROW: s.getInt(0) else: -2147483647
@@ -338,7 +356,7 @@ proc getTheString*(db: SQLiteral, statement: enum, params: varargs[DbValue, toDb
   ## | If query does not return any rows, returns empty string.
   ## | Automatically resets the statement.
   if(unlikely) db.loggerproc != nil: log()
-  let s = db.preparedstatements[threadi(db)][ord(statement)]
+  let s = preparedstatements[db.index * MaxStatements + ord(statement)]
   checkRc(db, bindParams(s, params))
   defer: discard sqlite3.reset(s)
   if step(s) == SQLITE_ROW: return s.getString(0)
@@ -367,7 +385,7 @@ proc getLastInsertRowid*(db: SQLiteral): int64 {.inline.} =
 proc rowExists*(db: SQLiteral, statement: enum, params: varargs[DbValue, toDb]): bool {.inline.} =
   ## Returns true if query returns any rows
   if(unlikely) db.loggerproc != nil: log()
-  let s = db.preparedstatements[threadi(db)][ord(statement)]
+  let s = preparedstatements[db.index * MaxStatements + ord(statement)]
   checkRc(db, bindParams(s, params))
   defer: discard sqlite3.reset(s)
   return step(s) == SQLITE_ROW
@@ -427,7 +445,7 @@ template withRow*(db: SQLiteral, statement: enum, params: varargs[DbValue, toDb]
   ## | Name for the prepared statement is given with row parameter.
   ## | The code block will be executed only if query returns a row.
   if(unlikely) db.loggerproc != nil: doLog(db, $statement, params)
-  let s = db.preparedstatements[threadi(db)][ord(statement)]
+  let s = preparedstatements[db.index * MaxStatements + ord(statement)]
   defer: discard reset(s)
   checkRc(db, bindParams(s, params))
   if step(s) == SQLITE_ROW:
@@ -440,7 +458,7 @@ template withRowOr*(db: SQLiteral, statement: enum, params: varargs[DbValue, toD
   ## | Name for the prepared statement is given with row parameter.  
   ## | First block will be executed if query returns a row, otherwise the second block.
   if(unlikely) db.loggerproc != nil: doLog(db, $statement, params)
-  let s = db.preparedstatements[threadi(db)][ord(statement)]
+  let s = preparedstatements[db.index * MaxStatements + ord(statement)]
   checkRc(db, bindParams(s, params))
   try:
     if step(s) == SQLITE_ROW:
@@ -463,7 +481,7 @@ proc exec*(db: SQLiteral, pstatement: Pstmt, params: varargs[DbValue, toDb]) {.i
 proc exec*(db: SQLiteral, statement: enum, params: varargs[DbValue, toDb]) {.inline.} =
   ## Executes given statement
   if(unlikely) db.loggerproc != nil: log()
-  let s = db.preparedstatements[threadi(db)][ord(statement)]
+  let s = preparedstatements[db.index * MaxStatements + ord(statement)]
   defer: discard sqlite3.reset(s)
   checkRc(db, bindParams(s, params))
   checkRc(db, step(s))
@@ -488,7 +506,7 @@ proc insert*(db: SQLiteral, statement: enum, params: varargs[DbValue, toDb]): in
   ## | Executes given statement and, if succesful, returns db.getLastinsertRowid().
   ## | If not succesful, returns -2147483647 (low(int32) + 1).
   if(unlikely) db.loggerproc != nil: log()
-  let s = db.preparedstatements[threadi(db)][ord(statement)]
+  let s = preparedstatements[db.index * MaxStatements + ord(statement)]
   defer: discard sqlite3.reset(s)
   checkRc(db, bindParams(s, params))
   result =
@@ -589,7 +607,7 @@ proc setOnCommitCallback*(db: var SQLiteral, oncommit: proc(sqliteral: SQLiteral
 
 template withInternal(db: SQLiteral, statement: enum, params: varargs[DbValue, toDb], body: untyped) {.dirty.} =
   if(unlikely) db.loggerproc != nil: db.loggerproc(db, $statement & " " & $params, -1)
-  let row {.inject.} = db.internalstatements[threadi(db)][ord(statement)]
+  let row {.inject.} = internalstatements[ord(statement)]
   defer: discard sqlite3.reset(row)
   checkRc(db, bindParams(row, params))
   if step(row) == SQLITE_ROW:
@@ -613,7 +631,7 @@ proc json_valid*(db: var SQLiteral, jsonstring: varargs[DbValue, toDb]): bool =
 iterator json_tree*(db: SQLiteral, jsonstring: varargs[DbValue, toDb]): PStmt =
   assert(jsonstring.len == 1)
   if(unlikely) db.loggerproc != nil: db.loggerproc(db, ($Jsontree).replace("?", $jsonstring[0]), -1)
-  let s = db.internalstatements[threadi(db)][ord(Jsontree)]
+  let s = internalstatements[ord(Jsontree)]
   checkRc(db, bindParams(s, jsonstring[0]))
   defer: discard sqlite3.reset(s)
   while step(s) == SQLITE_ROW: yield s
@@ -643,7 +661,7 @@ proc openDatabase*(db: var SQLiteral, dbname: string, schemas: openArray[string]
   ## .. code-block:: Nim
   ## 
   ##  const
-  ##    Schema1 = "CREATE TABLE IF NOT EXISTS Example(data TEXT NOT NULL)"
+  ##    Schema1 = "CREATE TABLE IF NOT EXISTS Example(data TEXT NOT NULL) STRICT"
   ##    Schema2 = "this is to be ignored"
   ##    Schema3 = """ALTER TABLE Example ADD COLUMN newcolumn TEXT NOT NULL DEFAULT """""
   ## 
@@ -659,8 +677,11 @@ proc openDatabase*(db: var SQLiteral, dbname: string, schemas: openArray[string]
   ##   ignorableschemaerrors = ["*"]); db3.close()
   ## 
   doAssert dbname != ""
+  withLock(openlock):
+    if nextdbindex == MaxDatabases: raiseAssert("Cannot create more than " & $MaxDatabases & " databases. Increase the MaxDatabases intdefine.")
+    db.index = nextdbindex
+    nextdbindex += 1
   initLock(db.transactionlock)
-  initLock(db.preparelock)
   db.dbname = dbname
   db.checkRc(open(dbname, db.sqlite))
  
@@ -698,24 +719,30 @@ proc openDatabase*(db: var SQLiteral, dbname: string, schema: string, maxKbSize 
 proc createStatement(db: var SQLiteral, statement: enum) =
   let index = ord(statement)
   if(unlikely) db.loggerproc != nil:
-    when compileOption("threads"):
-      if db.threadindices[0] == getThreadId(): db.loggerproc(db, $statement, -1)
-    else: db.loggerproc(db, $statement, -1)
-  db.preparedstatements[db.threadlen][index] = prepareSql(db, ($statement).cstring)
+    db.loggerproc(db, $statement, -1)
+  preparedstatements[db.index * MaxStatements + index] = prepareSql(db, ($statement).cstring)
 
 
 proc prepareStatements*(db: var SQLiteral, Statements: typedesc[enum]) =
   ## Prepares the statements given as enum parameter.
   ## Call this exactly once from every thread that is going to access the database.
   ## Main example shows how this "exactly once"-requirement can be achieved with a boolean threadvar.
-  withLock(db.preparelock):
-    when compileOption("threads"): db.threadindices[db.threadlen] = getThreadId()
-    else: db.threadindices[db.threadlen] = 0
-    for v in low(Statements) .. high(Statements): db.createStatement(v)
-    for v in low(InternalStatements) .. high(InternalStatements):
-      db.internalstatements[db.threadlen][ord(v)] =  prepareSql(db, ($v).cstring)    
-    db.threadlen.inc
-    db.laststatementindex = ord(high(Statements))
+  if destructortriggerer != nil: raiseAssert("pepareStatements has been already called for this thread " & $getThreadId())
+  destructortriggerer = new DestructorTriggerer
+  for v in low(Statements) .. high(Statements): db.createStatement(v)
+  for v in low(InternalStatements) .. high(InternalStatements):
+    internalstatements[db.index * InternalStatementCount + ord(v)] = prepareSql(db, ($v).cstring)    
+
+
+proc finalizeStatements*() =
+  ## Counterpart to [prepareStatements]: Call this once just before a thread is going to get destroyed.
+  ## Unlike [prepareStatements], this does not need to be invoked for every database, one call per thread is enough.
+  ## Also unlike [prepareStatements], extra calls do no harm.
+  ## 
+  ## There is some code that tries to trigger this automatically. For example, calling [close] triggers this automatically for that thread.
+  ## Unfortunately this automation does not always work. In that case, you will get an "unable to close due to unfinalized statements" message
+  ## when calling [close], and in that case, you will have to do the finalizeStatements calls manually (see the main example for an example).
+  destructortriggerer = nil
     
 
 proc setReadonly*(db: var SQLiteral, readonly: bool) =
@@ -842,7 +869,6 @@ proc about*(db: SQLiteral) =
   discard finalize(Get_options)
   echo "Pagesize=", $db.getTheInt("PRAGMA page_size")
   echo "WALautocheckpoint=", $db.getTheInt("PRAGMA wal_autocheckpoint")
-  if db.preparedstatements.len > 0: echo "Preparedstatements=", $(db.preparedstatements[0].len)
   if not db.inMemory:
     let filesize = getFileSize(db.dbname)
     echo "Filesize=", filesize
@@ -855,18 +881,8 @@ proc about*(db: SQLiteral) =
 when defined(staticSqlite):
   proc db_status(db: PSqlite3, op: int32, cur: ptr int32, highest: ptr int32, reset: int32): int32 {.cdecl, importc: "sqlite3_db_status".}
 else:
-  when defined(windows):
-    when defined(nimOldDlls):
-      const Lib = "sqlite3.dll"
-    elif defined(cpu64):
-      const Lib = "sqlite3_64.dll"
-    else:
-      const Lib = "sqlite3_32.dll"
-  elif defined(macosx):
-    const Lib = "libsqlite3(|.0).dylib"
-  else:
-    const Lib = "libsqlite3.so(|.0)"
   proc db_status(db: PSqlite3, op: int32, cur: ptr int32, highest: ptr int32, reset: int32): int32 {.cdecl, dynlib: Lib, importc: "sqlite3_db_status".}
+
 
 proc getStatus*(db: SQLiteral, status: int, resethighest = false): (int, int) =
   ## Retrieves queried status info.
@@ -883,6 +899,16 @@ proc getStatus*(db: SQLiteral, status: int, resethighest = false): (int, int) =
   return (c.int, h.int)
 
 
+when defined(staticSqlite):
+  proc callInterrupt(db: PSqlite3) {.cdecl, importc: "sqlite3_interrupt".}
+else:
+  proc callInterrupt(db: PSqlite3) {.cdecl, dynlib: Lib, importc: "sqlite3_interrupt".}
+
+proc interrupt*(db: var SQLiteral) =
+  ## Interrupts long running operations by calling https://www.sqlite.org/c3ref/interrupt.html
+  callInterrupt(db.sqlite)
+  
+
 proc close*(db: var SQLiteral) =
   ## Closes the database.
   if db.Transaction == nil:
@@ -893,13 +919,10 @@ proc close*(db: var SQLiteral) =
   var rc = 0
   acquire(db.transactionlock)
   try:
-    for thread in 0 ..< db.threadlen:
-      for i in 0 .. db.laststatementindex:
-        discard db.preparedstatements[thread][i].finalize()
-      for s in db.internalstatements[thread]: discard s.finalize()
     discard db.Transaction.finalize()
     discard db.Commit.finalize()
     discard db.Rollback.finalize()
+    finalizeStatements()
     rc = close(db.sqlite)
     if rc == SQLITE_OK:
       db.Transaction = nil

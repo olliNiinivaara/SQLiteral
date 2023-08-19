@@ -1,10 +1,9 @@
 # Package
 
-version       = "3.0.1"
+version       = "4.0.0"
 author        = "Olli"
 description   = "A high level SQLite API for Nim"
 license       = "MIT"
-srcDir        = "src"
 
 # Dependencies
 

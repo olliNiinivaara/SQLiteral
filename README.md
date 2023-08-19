@@ -11,10 +11,16 @@ http://olliNiinivaara.github.io/SQLiteral/
 
 ## Installation
 
-`nimble install sqliteral`
+`atlas use sqliteral`
 
-## 3.0.1 Release notes (2023-03-27)
-* catching CatchableError instead of Exception in transaction template
+## 4.0.0 Release notes (2023-08-19)
+* Compatibility with Nim 2
+* Single-threaded mode is not supported anymore (breaking change)
+* Avoid crashing from trying to get filesize of in-memory database in about
+* Unlimited amount of threads supported
+* New finalizeStatements proc (semi-breaking change)
+* New interrupt proc
+* Various minor performance and other fixes
 
 ## Example
 
