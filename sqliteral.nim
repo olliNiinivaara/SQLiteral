@@ -607,7 +607,7 @@ proc setOnCommitCallback*(db: var SQLiteral, oncommit: proc(sqliteral: SQLiteral
 
 template withInternal(db: SQLiteral, statement: enum, params: varargs[DbValue, toDb], body: untyped) {.dirty.} =
   if(unlikely) db.loggerproc != nil: db.loggerproc(db, $statement & " " & $params, -1)
-  let row {.inject.} = internalstatements[ord(statement)]
+  let row {.inject.} = internalstatements[db.index * InternalStatementCount + ord(statement)]
   defer: discard sqlite3.reset(row)
   checkRc(db, bindParams(row, params))
   if step(row) == SQLITE_ROW:
@@ -631,7 +631,7 @@ proc json_valid*(db: var SQLiteral, jsonstring: varargs[DbValue, toDb]): bool =
 iterator json_tree*(db: SQLiteral, jsonstring: varargs[DbValue, toDb]): PStmt =
   assert(jsonstring.len == 1)
   if(unlikely) db.loggerproc != nil: db.loggerproc(db, ($Jsontree).replace("?", $jsonstring[0]), -1)
-  let s = internalstatements[ord(Jsontree)]
+  let s = internalstatements[db.index * InternalStatementCount + ord(Jsontree)]
   checkRc(db, bindParams(s, jsonstring[0]))
   defer: discard sqlite3.reset(s)
   while step(s) == SQLITE_ROW: yield s
@@ -727,8 +727,7 @@ proc prepareStatements*(db: var SQLiteral, Statements: typedesc[enum]) =
   ## Prepares the statements given as enum parameter.
   ## Call this exactly once from every thread that is going to access the database.
   ## Main example shows how this "exactly once"-requirement can be achieved with a boolean threadvar.
-  if destructortriggerer != nil: raiseAssert("pepareStatements has been already called for this thread " & $getThreadId())
-  destructortriggerer = new DestructorTriggerer
+  if destructortriggerer == nil: destructortriggerer = new DestructorTriggerer
   for v in low(Statements) .. high(Statements): db.createStatement(v)
   for v in low(InternalStatements) .. high(InternalStatements):
     internalstatements[db.index * InternalStatementCount + ord(v)] = prepareSql(db, ($v).cstring)    
