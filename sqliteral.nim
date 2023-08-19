@@ -167,13 +167,13 @@ type
 const InternalStatementCount = ord(JSontree) + 1
 
 var
-  openlock: Lock
+  globallock: Lock
   nextdbindex = 0
   preparedstatements {.threadvar.} : array[MaxDatabases * MaxStatements, PStmt]
   internalstatements {.threadvar.} : array[MaxDatabases * InternalStatementCount, PStmt]
   destructortriggerer {.threadvar.}: ref DestructorTriggerer
 
-initLock(openlock)
+initLock(globallock)
 
 
 proc `=destroy`(x: DestructorTriggerer) =
@@ -677,7 +677,7 @@ proc openDatabase*(db: var SQLiteral, dbname: string, schemas: openArray[string]
   ##   ignorableschemaerrors = ["*"]); db3.close()
   ## 
   doAssert dbname != ""
-  withLock(openlock):
+  withLock(globallock):
     if nextdbindex == MaxDatabases: raiseAssert("Cannot create more than " & $MaxDatabases & " databases. Increase the MaxDatabases intdefine.")
     db.index = nextdbindex
     nextdbindex += 1
@@ -727,7 +727,8 @@ proc prepareStatements*(db: var SQLiteral, Statements: typedesc[enum]) =
   ## Prepares the statements given as enum parameter.
   ## Call this exactly once from every thread that is going to access the database.
   ## Main example shows how this "exactly once"-requirement can be achieved with a boolean threadvar.
-  if destructortriggerer == nil: destructortriggerer = new DestructorTriggerer
+  withLock(globallock):
+    if destructortriggerer == nil: destructortriggerer = new DestructorTriggerer
   for v in low(Statements) .. high(Statements): db.createStatement(v)
   for v in low(InternalStatements) .. high(InternalStatements):
     internalstatements[db.index * InternalStatementCount + ord(v)] = prepareSql(db, ($v).cstring)    
