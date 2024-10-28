@@ -1,7 +1,7 @@
-const SQLiteralVersion* = "4.0.0"
+const SQLiteralVersion* = "4.0.1"
 static: doAssert(compileOption("threads"))
 
-# (C) Olli Niinivaara, 2020-2023
+# (C) Olli Niinivaara, 2020-2024
 # MIT Licensed
 
 ## A high level SQLite API with support for multi-threading, prepared statements,
@@ -13,9 +13,8 @@ static: doAssert(compileOption("threads"))
 ## .. code-block:: Nim
 ##  
 ##  
-##  import sqliteral, threadpool
+##  import sqliteral, malebolgia
 ##  from strutils import find
-##  from os import sleep
 ##  
 ##  const Schema = "CREATE TABLE IF NOT EXISTS Example(name TEXT NOT NULL, jsondata TEXT NOT NULL) STRICT"
 ##  
@@ -30,7 +29,6 @@ static: doAssert(compileOption("threads"))
 ##  var
 ##    db: SQLiteral
 ##    prepared {.threadvar.}: bool
-##    ready: int
 ##  
 ##  when not defined(release): db.setLogger(proc(db: SQLiteral, msg: string, code: int) = echo msg)
 ##  
@@ -43,7 +41,6 @@ static: doAssert(compileOption("threads"))
 ##        stdout.write(row.getCString(0))
 ##        stdout.write('\n')
 ##      finalizeStatements()
-##      discard ready.atomicInc
 ##  
 ##  proc run() =
 ##    db.openDatabase("ex.db", Schema)
@@ -58,8 +55,9 @@ static: doAssert(compileOption("threads"))
 ##    
 ##    echo "10000 rows inserted. Press <Enter> to select all in 4 threads..."
 ##    discard stdin.readChar()
-##    for i in 1 .. 4: spawn(select())
-##    while (ready < 4): sleep(20)
+##    var m = createMaster()
+##    m.awaitAll:
+##      for i in 1 .. 4: m.spawn select()
 ##    stdout.flushFile()
 ##    echo "Selected 4 * ", db.getTheInt(Count), " = " & $(4 * db.getTheInt(Count)) & " rows."
 ##  
@@ -97,10 +95,7 @@ when not defined(disableSqliteoptions):
   when defined(danger):
     {.passC: "-DSQLITE_USE_ALLOCA -DSQLITE_MAX_EXPR_DEPTH=0".}
 
-when NimMajor == 2:
-  import db_connector/sqlite3
-else:
-  import std/sqlite3
+import db_connector/sqlite3
 export PStmt, errmsg, reset, step, finalize, SQLITE_ROW
 import locks
 from os import getFileSize
@@ -167,13 +162,13 @@ type
 const InternalStatementCount = ord(JSontree) + 1
 
 var
-  globallock: Lock
+  openlock: Lock
   nextdbindex = 0
   preparedstatements {.threadvar.} : array[MaxDatabases * MaxStatements, PStmt]
   internalstatements {.threadvar.} : array[MaxDatabases * InternalStatementCount, PStmt]
   destructortriggerer {.threadvar.}: ref DestructorTriggerer
 
-initLock(globallock)
+initLock(openlock)
 
 
 proc `=destroy`(x: DestructorTriggerer) =
@@ -605,7 +600,7 @@ proc setOnCommitCallback*(db: var SQLiteral, oncommit: proc(sqliteral: SQLiteral
 
 #-----------------------------------------------------------------------------------------------------------
 
-template withInternal(db: SQLiteral, statement: enum, params: varargs[DbValue, toDb], body: untyped) {.dirty.} =
+template withInternal(db: SQLiteral, statement: enum, params: varargs[DbValue, toDb], body: untyped): untyped {.dirty.} =
   if(unlikely) db.loggerproc != nil: db.loggerproc(db, $statement & " " & $params, -1)
   let row {.inject.} = internalstatements[db.index * InternalStatementCount + ord(statement)]
   defer: discard sqlite3.reset(row)
@@ -677,7 +672,7 @@ proc openDatabase*(db: var SQLiteral, dbname: string, schemas: openArray[string]
   ##   ignorableschemaerrors = ["*"]); db3.close()
   ## 
   doAssert dbname != ""
-  withLock(globallock):
+  withLock(openlock):
     if nextdbindex == MaxDatabases: raiseAssert("Cannot create more than " & $MaxDatabases & " databases. Increase the MaxDatabases intdefine.")
     db.index = nextdbindex
     nextdbindex += 1
@@ -727,8 +722,7 @@ proc prepareStatements*(db: var SQLiteral, Statements: typedesc[enum]) =
   ## Prepares the statements given as enum parameter.
   ## Call this exactly once from every thread that is going to access the database.
   ## Main example shows how this "exactly once"-requirement can be achieved with a boolean threadvar.
-  withLock(globallock):
-    if destructortriggerer == nil: destructortriggerer = new DestructorTriggerer
+  if destructortriggerer == nil: destructortriggerer = new DestructorTriggerer
   for v in low(Statements) .. high(Statements): db.createStatement(v)
   for v in low(InternalStatements) .. high(InternalStatements):
     internalstatements[db.index * InternalStatementCount + ord(v)] = prepareSql(db, ($v).cstring)    

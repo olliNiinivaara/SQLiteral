@@ -22,6 +22,12 @@ http://olliNiinivaara.github.io/SQLiteral/
 * New interrupt proc
 * Various minor performance and other fixes
 
+## 4.0.1 Release notes (2024-10-28)
+* Compatibility with Nim 2.2
+* Dark mode support in docs
+* Threaded JSON example uses malebolgia instead of threadpools
+* Nim 1.x is not supported anymore, please upgrade now
+
 ## Example
 
 ```nim
