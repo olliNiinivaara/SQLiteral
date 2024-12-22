@@ -51,8 +51,9 @@
       </select>
     </div>
     <ul class="simple simple-toc" id="toc-list">
-  <li><a class="reference" id="example-using-json-extensions_toc" href="#example-using-json-extensions">Example (using JSON extensions)</a></li>
+  <li><a class="reference" id="example_toc" href="#example">Example</a></li>
 <li><a class="reference" id="compiling-with-sqlite3dotc_toc" href="#compiling-with-sqlite3dotc">Compiling with sqlite3.c</a></li>
+<li><a class="reference" id="statements-in-enum-lists_toc" href="#statements-in-enum-lists">Statements in enum lists</a></li>
 <li>
   <details open>
     <summary><a class="reference reference-toplevel" href="#7" id="57">Types</a></summary>
@@ -84,7 +85,7 @@
     <ul class="simple simple-toc-section">
       <li><a class="reference" href="#MaxDatabases" title="MaxDatabases {.intdefine.} = 2">MaxDatabases</a></li>
 <li><a class="reference" href="#MaxStatements" title="MaxStatements {.intdefine.} = 200">MaxStatements</a></li>
-<li><a class="reference" href="#SQLiteralVersion" title="SQLiteralVersion = &quot;4.0.1&quot;">SQLiteralVersion</a></li>
+<li><a class="reference" href="#SQLiteralVersion" title="SQLiteralVersion = &quot;5.0.0&quot;">SQLiteralVersion</a></li>
 
     </ul>
   </details>
@@ -196,18 +197,6 @@
   <li><a class="reference" href="#isIntransaction%2CSQLiteral" title="isIntransaction(db: SQLiteral): bool">isIntransaction(db: SQLiteral): bool</a></li>
 
 </ul>
-<ul class="simple nested-toc-section">json_extract
-  <li><a class="reference" href="#json_extract%2CSQLiteral%2Cstring%2Cvarargs%5BDbValue%2CtoDb%5D" title="json_extract(db: var SQLiteral; path: string; jsonstring: varargs[DbValue, toDb]): string">json_extract(db: var SQLiteral; path: string; jsonstring: varargs[DbValue, toDb]): string</a></li>
-
-</ul>
-<ul class="simple nested-toc-section">json_patch
-  <li><a class="reference" href="#json_patch%2CSQLiteral%2Cstring%2Cvarargs%5BDbValue%2CtoDb%5D" title="json_patch(db: var SQLiteral; patch: string; jsonstring: varargs[DbValue, toDb]): string">json_patch(db: var SQLiteral; patch: string; jsonstring: varargs[DbValue, toDb]): string</a></li>
-
-</ul>
-<ul class="simple nested-toc-section">json_valid
-  <li><a class="reference" href="#json_valid%2CSQLiteral%2Cvarargs%5BDbValue%2CtoDb%5D" title="json_valid(db: var SQLiteral; jsonstring: varargs[DbValue, toDb]): bool">json_valid(db: var SQLiteral; jsonstring: varargs[DbValue, toDb]): bool</a></li>
-
-</ul>
 <ul class="simple nested-toc-section">openDatabase
   <li><a class="reference" href="#openDatabase%2CSQLiteral%2Cstring%2Cstring%2Cint" title="openDatabase(db: var SQLiteral; dbname: string; schema: string; maxKbSize = 0;
              wal = true)">openDatabase(db: var SQLiteral; dbname: string; schema: string; maxKbSize = 0;
@@ -228,7 +217,7 @@
 
 </ul>
 <ul class="simple nested-toc-section">prepareStatements
-  <li><a class="reference" href="#prepareStatements%2CSQLiteral%2Ctypedesc%5B%5D" title="prepareStatements(db: var SQLiteral; Statements: typedesc[enum])">prepareStatements(db: var SQLiteral; Statements: typedesc[enum])</a></li>
+  <li><a class="reference" href="#prepareStatements%2CSQLiteral%2Ctypedesc%5B%5D" title="prepareStatements(db: var SQLiteral; statements: typedesc[enum])">prepareStatements(db: var SQLiteral; statements: typedesc[enum])</a></li>
 
 </ul>
 <ul class="simple nested-toc-section">rowExists
@@ -284,11 +273,7 @@
   <details open>
     <summary><a class="reference reference-toplevel" href="#15" id="65">Iterators</a></summary>
     <ul class="simple simple-toc-section">
-      <ul class="simple nested-toc-section">json_tree
-  <li><a class="reference" href="#json_tree.i%2CSQLiteral%2Cvarargs%5BDbValue%2CtoDb%5D" title="json_tree(db: SQLiteral; jsonstring: varargs[DbValue, toDb]): PStmt">json_tree(db: SQLiteral; jsonstring: varargs[DbValue, toDb]): PStmt</a></li>
-
-</ul>
-<ul class="simple nested-toc-section">rows
+      <ul class="simple nested-toc-section">rows
   <li><a class="reference" href="#rows.i%2CSQLiteral%2CPStmt%2Cvarargs%5BDbValue%2CtoDb%5D" title="rows(db: SQLiteral; pstatement: PStmt; params: varargs[DbValue, toDb]): PStmt">rows(db: SQLiteral; pstatement: PStmt; params: varargs[DbValue, toDb]): PStmt</a></li>
 <li><a class="reference" href="#rows.i%2CSQLiteral%2C%2Cvarargs%5BDbValue%2CtoDb%5D" title="rows(db: SQLiteral; statement: enum; params: varargs[DbValue, toDb]): PStmt">rows(db: SQLiteral; statement: enum; params: varargs[DbValue, toDb]): PStmt</a></li>
 
@@ -339,57 +324,51 @@
     
     <div id="tocRoot"></div>
     
-    <p class="module-desc">A high level SQLite API with support for multi-threading, prepared statements, proper typing, zero-copy data paths, debugging, JSON, optimizing, backups, and more.
-<h1><a class="toc-backref" id="example-using-json-extensions" href="#example-using-json-extensions">Example (using JSON extensions)</a></h1><pre class="listing"><span class="Keyword">import</span> <span class="Identifier">sqliteral</span><span class="Punctuation">,</span> <span class="Identifier">malebolgia</span>
-<span class="Keyword">from</span> <span class="Identifier">strutils</span> <span class="Keyword">import</span> <span class="Identifier">find</span>
+    <p class="module-desc">A high level SQLite API with support for multi-threading, prepared statements, proper typing, zero-copy data paths, debugging, optimizing, backups, and more.
+<h1><a class="toc-backref" id="example" href="#example">Example</a></h1><pre class="listing"><span class="Keyword">import</span> <span class="Identifier">sqliteral</span>
 
 <span class="Keyword">const</span> <span class="Identifier">Schema</span> <span class="Operator">=</span> <span class="StringLit">&quot;CREATE TABLE IF NOT EXISTS Example(name TEXT NOT NULL, jsondata TEXT NOT NULL) STRICT&quot;</span>
 
-<span class="Keyword">type</span> <span class="Identifier">SqlStatements</span> <span class="Operator">=</span> <span class="Keyword">enum</span>
+<span class="Identifier">SqlStatements</span> <span class="Operator">=</span> <span class="Keyword">enum</span>
   <span class="Identifier">Insert</span> <span class="Operator">=</span> <span class="LongStringLit">&quot;&quot;&quot;INSERT INTO Example (name, jsondata)
-  VALUES (json_extract(?, '$.name'), json_extract(?, '$.data'))&quot;&quot;&quot;</span>
-  <span class="Identifier">Count</span> <span class="Operator">=</span> <span class="StringLit">&quot;SELECT count(*) FROM Example&quot;</span>
+   VALUES (json_extract(?, '$.name'), json_extract(?, '$.data'))&quot;&quot;&quot;</span>
   <span class="Identifier">Select</span> <span class="Operator">=</span> <span class="StringLit">&quot;SELECT json_extract(jsondata, '$.array') FROM Example&quot;</span>
 
-<span class="Keyword">let</span> <span class="Identifier">httprequest</span> <span class="Operator">=</span> <span class="LongStringLit">&quot;&quot;&quot;header BODY:{&quot;name&quot;:&quot;Alice&quot;, &quot;data&quot;:{&quot;info&quot;:&quot;xxx&quot;, &quot;array&quot;:[&quot;a&quot;,&quot;b&quot;,&quot;c&quot;]}}&quot;&quot;&quot;</span>
+<span class="Identifier">ExtraStatements</span> <span class="Operator">=</span> <span class="Keyword">enum</span>
+  <span class="Identifier">Count</span> <span class="Operator">=</span> <span class="Punctuation">(</span><span class="DecNumber">2</span><span class="Punctuation">,</span> <span class="StringLit">&quot;SELECT count(*) FROM Example&quot;</span><span class="Punctuation">)</span>
+  <span class="Comment"># Statement ordinal values must be unique across all statements</span>
 
-<span class="Keyword">var</span>
-  <span class="Identifier">db</span><span class="Punctuation">:</span> <span class="Identifier">SQLiteral</span>
-  <span class="Identifier">prepared</span> <span class="Punctuation">{</span><span class="Operator">.</span><span class="Identifier">threadvar</span><span class="Operator">.</span><span class="Punctuation">}</span><span class="Punctuation">:</span> <span class="Identifier">bool</span>
+<span class="Keyword">let</span> <span class="Identifier">json</span> <span class="Operator">=</span> <span class="Identifier">toDb</span><span class="Punctuation">(</span><span class="LongStringLit">&quot;&quot;&quot;{&quot;name&quot;:&quot;Alice&quot;, &quot;data&quot;:{&quot;info&quot;:&quot;xxx&quot;, &quot;array&quot;:[&quot;a&quot;,&quot;b&quot;,&quot;c&quot;]}}&quot;&quot;&quot;</span><span class="Punctuation">)</span>
 
+<span class="Keyword">var</span> <span class="Identifier">db</span><span class="Punctuation">:</span> <span class="Identifier">SQLiteral</span>
 <span class="Keyword">when</span> <span class="Keyword">not</span> <span class="Identifier">defined</span><span class="Punctuation">(</span><span class="Identifier">release</span><span class="Punctuation">)</span><span class="Punctuation">:</span> <span class="Identifier">db</span><span class="Operator">.</span><span class="Identifier">setLogger</span><span class="Punctuation">(</span><span class="Keyword">proc</span><span class="Punctuation">(</span><span class="Identifier">db</span><span class="Punctuation">:</span> <span class="Identifier">SQLiteral</span><span class="Punctuation">,</span> <span class="Identifier">msg</span><span class="Punctuation">:</span> <span class="Identifier">string</span><span class="Punctuation">,</span> <span class="Identifier">code</span><span class="Punctuation">:</span> <span class="Identifier">int</span><span class="Punctuation">)</span> <span class="Operator">=</span> <span class="Identifier">echo</span> <span class="Identifier">msg</span><span class="Punctuation">)</span>
 
 <span class="Keyword">proc</span> <span class="Identifier">select</span><span class="Punctuation">(</span><span class="Punctuation">)</span> <span class="Operator">=</span>
   <span class="Punctuation">{</span><span class="Operator">.</span><span class="Identifier">gcsafe</span><span class="Operator">.</span><span class="Punctuation">}</span><span class="Punctuation">:</span>
-    <span class="Keyword">if</span> <span class="Keyword">not</span> <span class="Identifier">prepared</span><span class="Punctuation">:</span>
-      <span class="Identifier">db</span><span class="Operator">.</span><span class="Identifier">prepareStatements</span><span class="Punctuation">(</span><span class="Identifier">SqlStatements</span><span class="Punctuation">)</span>
-      <span class="Identifier">prepared</span> <span class="Operator">=</span> <span class="Identifier">true</span>
-    <span class="Keyword">for</span> <span class="Identifier">row</span> <span class="Keyword">in</span> <span class="Identifier">db</span><span class="Operator">.</span><span class="Identifier">rows</span><span class="Punctuation">(</span><span class="Identifier">Select</span><span class="Punctuation">)</span><span class="Punctuation">:</span>
-      <span class="Identifier">stdout</span><span class="Operator">.</span><span class="Identifier">write</span><span class="Punctuation">(</span><span class="Identifier">row</span><span class="Operator">.</span><span class="Identifier">getCString</span><span class="Punctuation">(</span><span class="DecNumber">0</span><span class="Punctuation">)</span><span class="Punctuation">)</span>
-      <span class="Identifier">stdout</span><span class="Operator">.</span><span class="Identifier">write</span><span class="Punctuation">(</span><span class="Punctuation">'</span><span class="Operator">\</span><span class="Identifier">n</span><span class="CharLit">')</span>
-    <span class="Identifier">finalizeStatements</span><span class="Punctuation">(</span><span class="Punctuation">)</span>
+    <span class="Keyword">for</span> <span class="Identifier">row</span> <span class="Keyword">in</span> <span class="Identifier">db</span><span class="Operator">.</span><span class="Identifier">rows</span><span class="Punctuation">(</span><span class="Identifier">Select</span><span class="Punctuation">)</span><span class="Punctuation">:</span> <span class="Identifier">stdout</span><span class="Operator">.</span><span class="Identifier">write</span><span class="Punctuation">(</span><span class="Identifier">row</span><span class="Operator">.</span><span class="Identifier">getCString</span><span class="Punctuation">(</span><span class="DecNumber">0</span><span class="Punctuation">)</span><span class="Punctuation">)</span>
 
 <span class="Keyword">proc</span> <span class="Identifier">run</span><span class="Punctuation">(</span><span class="Punctuation">)</span> <span class="Operator">=</span>
-  <span class="Identifier">db</span><span class="Operator">.</span><span class="Identifier">openDatabase</span><span class="Punctuation">(</span><span class="StringLit">&quot;ex.db&quot;</span><span class="Punctuation">,</span> <span class="Identifier">Schema</span><span class="Punctuation">)</span>
-  <span class="Keyword">defer</span><span class="Punctuation">:</span> <span class="Identifier">db</span><span class="Operator">.</span><span class="Identifier">close</span><span class="Punctuation">(</span><span class="Punctuation">)</span>
-  <span class="Identifier">db</span><span class="Operator">.</span><span class="Identifier">prepareStatements</span><span class="Punctuation">(</span><span class="Identifier">SqlStatements</span><span class="Punctuation">)</span>
-  <span class="Keyword">let</span> <span class="Identifier">body</span> <span class="Operator">=</span> <span class="Identifier">httprequest</span><span class="Operator">.</span><span class="Identifier">toDb</span><span class="Punctuation">(</span><span class="Identifier">httprequest</span><span class="Operator">.</span><span class="Identifier">find</span><span class="Punctuation">(</span><span class="StringLit">&quot;BODY:&quot;</span><span class="Punctuation">)</span> <span class="Operator">+</span> <span class="DecNumber">5</span><span class="Punctuation">,</span> <span class="Identifier">httprequest</span><span class="Operator">.</span><span class="Identifier">len</span> <span class="Operator">-</span> <span class="DecNumber">1</span><span class="Punctuation">)</span>
-  <span class="Keyword">if</span> <span class="Keyword">not</span> <span class="Identifier">db</span><span class="Operator">.</span><span class="Identifier">json_valid</span><span class="Punctuation">(</span><span class="Identifier">body</span><span class="Punctuation">)</span><span class="Punctuation">:</span> <span class="Identifier">quit</span><span class="Punctuation">(</span><span class="DecNumber">0</span><span class="Punctuation">)</span>
-  
   <span class="Identifier">echo</span> <span class="StringLit">&quot;inserting 10000 rows...&quot;</span>
   <span class="Identifier">db</span><span class="Operator">.</span><span class="Identifier">transaction</span><span class="Punctuation">:</span>
-    <span class="Keyword">for</span> <span class="Identifier">i</span> <span class="Keyword">in</span> <span class="DecNumber">1</span> <span class="Operator">..</span> <span class="DecNumber">10000</span><span class="Punctuation">:</span> <span class="Keyword">discard</span> <span class="Identifier">db</span><span class="Operator">.</span><span class="Identifier">insert</span><span class="Punctuation">(</span><span class="Identifier">Insert</span><span class="Punctuation">,</span> <span class="Identifier">body</span><span class="Punctuation">,</span> <span class="Identifier">body</span><span class="Punctuation">)</span>
+    <span class="Keyword">for</span> <span class="Identifier">i</span> <span class="Keyword">in</span> <span class="DecNumber">1</span> <span class="Operator">..</span> <span class="DecNumber">10000</span><span class="Punctuation">:</span> <span class="Keyword">discard</span> <span class="Identifier">db</span><span class="Operator">.</span><span class="Identifier">insert</span><span class="Punctuation">(</span><span class="Identifier">Insert</span><span class="Punctuation">,</span> <span class="Identifier">json</span><span class="Punctuation">,</span> <span class="Identifier">json</span><span class="Punctuation">)</span>
   
-  <span class="Identifier">echo</span> <span class="StringLit">&quot;10000 rows inserted. Press &lt;Enter&gt; to select all in 4 threads...&quot;</span>
+  <span class="Keyword">let</span> <span class="Identifier">count</span> <span class="Operator">=</span> <span class="Identifier">db</span><span class="Operator">.</span><span class="Identifier">getTheInt</span><span class="Punctuation">(</span><span class="Identifier">Count</span><span class="Punctuation">)</span>
+  <span class="Identifier">echo</span> <span class="StringLit">&quot;10000 more rows inserted.&quot;</span>
+  <span class="Identifier">echo</span> <span class="StringLit">&quot;Press &lt;Enter&gt; to select from the all existing &quot;</span><span class="Punctuation">,</span> <span class="Identifier">count</span><span class="Punctuation">,</span> <span class="StringLit">&quot; rows in 4 parallel threads...&quot;</span>
   <span class="Keyword">discard</span> <span class="Identifier">stdin</span><span class="Operator">.</span><span class="Identifier">readChar</span><span class="Punctuation">(</span><span class="Punctuation">)</span>
-  <span class="Keyword">var</span> <span class="Identifier">m</span> <span class="Operator">=</span> <span class="Identifier">createMaster</span><span class="Punctuation">(</span><span class="Punctuation">)</span>
-  <span class="Identifier">m</span><span class="Operator">.</span><span class="Identifier">awaitAll</span><span class="Punctuation">:</span>
-    <span class="Keyword">for</span> <span class="Identifier">i</span> <span class="Keyword">in</span> <span class="DecNumber">1</span> <span class="Operator">..</span> <span class="DecNumber">4</span><span class="Punctuation">:</span> <span class="Identifier">m</span><span class="Operator">.</span><span class="Identifier">spawn</span> <span class="Identifier">select</span><span class="Punctuation">(</span><span class="Punctuation">)</span>
+  
+  <span class="Keyword">var</span> <span class="Identifier">thr</span><span class="Punctuation">:</span> <span class="Identifier">array</span><span class="Punctuation">[</span><span class="DecNumber">4</span><span class="Punctuation">,</span> <span class="Identifier">Thread</span><span class="Punctuation">[</span><span class="Identifier">void</span><span class="Punctuation">]</span><span class="Punctuation">]</span>
+  <span class="Keyword">for</span> <span class="Identifier">i</span> <span class="Keyword">in</span> <span class="FloatNumber">0.</span><span class="Operator">.</span><span class="Identifier">high</span><span class="Punctuation">(</span><span class="Identifier">thr</span><span class="Punctuation">)</span><span class="Punctuation">:</span> <span class="Identifier">createThread</span><span class="Punctuation">(</span><span class="Identifier">thr</span><span class="Punctuation">[</span><span class="Identifier">i</span><span class="Punctuation">]</span><span class="Punctuation">,</span> <span class="Identifier">select</span><span class="Punctuation">)</span>
+  <span class="Identifier">joinThreads</span><span class="Punctuation">(</span><span class="Identifier">thr</span><span class="Punctuation">)</span>
   <span class="Identifier">stdout</span><span class="Operator">.</span><span class="Identifier">flushFile</span><span class="Punctuation">(</span><span class="Punctuation">)</span>
-  <span class="Identifier">echo</span> <span class="StringLit">&quot;Selected 4 * &quot;</span><span class="Punctuation">,</span> <span class="Identifier">db</span><span class="Operator">.</span><span class="Identifier">getTheInt</span><span class="Punctuation">(</span><span class="Identifier">Count</span><span class="Punctuation">)</span><span class="Punctuation">,</span> <span class="StringLit">&quot; = &quot;</span> <span class="Operator">&amp;</span> <span class="Operator">$</span><span class="Punctuation">(</span><span class="DecNumber">4</span> <span class="Operator">*</span> <span class="Identifier">db</span><span class="Operator">.</span><span class="Identifier">getTheInt</span><span class="Punctuation">(</span><span class="Identifier">Count</span><span class="Punctuation">)</span><span class="Punctuation">)</span> <span class="Operator">&amp;</span> <span class="StringLit">&quot; rows.&quot;</span>
+  <span class="Identifier">echo</span> <span class="StringLit">&quot;Selected &quot;</span> <span class="Operator">&amp;</span> <span class="Operator">$</span><span class="Punctuation">(</span><span class="DecNumber">4</span> <span class="Operator">*</span> <span class="Identifier">count</span><span class="Punctuation">)</span> <span class="Operator">&amp;</span> <span class="StringLit">&quot; arrays.&quot;</span>
 
-<span class="Identifier">run</span><span class="Punctuation">(</span><span class="Punctuation">)</span></pre>
-<h1><a class="toc-backref" id="compiling-with-sqlite3dotc" href="#compiling-with-sqlite3dotc">Compiling with sqlite3.c</a></h1><p>First, sqlite3.c amalgamation must be on compiler search path.<br/>You can extract it from a zip available at <a class="reference external" href="https://www.sqlite.org/download.html">https://www.sqlite.org/download.html</a>.<br/>Then, <tt class="docutils literal"><span class="pre"><span class="Operator">-</span><span class="Identifier">d</span><span class="Punctuation">:</span><span class="Identifier">staticSqlite</span></span></tt>compiler option must be used.<br/></p><p>For your convenience, <tt class="docutils literal"><span class="pre"><span class="Operator">-</span><span class="Identifier">d</span><span class="Punctuation">:</span><span class="Identifier">staticSqlite</span></span></tt> triggers some useful SQLite compiler options, consult sqliteral source code or <tt class="docutils literal"><span class="pre"><span class="Identifier">about</span><span class="Punctuation">(</span><span class="Punctuation">)</span></span></tt> proc for details. These can be turned off with <tt class="docutils literal"><span class="pre"><span class="Operator">-</span><span class="Identifier">d</span><span class="Punctuation">:</span><span class="Identifier">disableSqliteoptions</span></span></tt> option. </p>
+<span class="Identifier">db</span><span class="Operator">.</span><span class="Identifier">openDatabase</span><span class="Punctuation">(</span><span class="StringLit">&quot;ex.db&quot;</span><span class="Punctuation">,</span> <span class="Identifier">Schema</span><span class="Punctuation">)</span>
+<span class="Identifier">run</span><span class="Punctuation">(</span><span class="Punctuation">)</span>
+<span class="Identifier">db</span><span class="Operator">.</span><span class="Identifier">close</span><span class="Punctuation">(</span><span class="Punctuation">)</span></pre>
+<h1><a class="toc-backref" id="compiling-with-sqlite3dotc" href="#compiling-with-sqlite3dotc">Compiling with sqlite3.c</a></h1><p>First, sqlite3.c amalgamation must be on compiler search path.<br/>You can extract it from a zip available at <a class="reference external" href="https://www.sqlite.org/download.html">https://www.sqlite.org/download.html</a>.<br/>Then, <tt class="docutils literal"><span class="pre"><span class="Operator">-</span><span class="Identifier">d</span><span class="Punctuation">:</span><span class="Identifier">staticSqlite</span></span></tt>compiler option must be used.<br/></p><p>For your convenience, <tt class="docutils literal"><span class="pre"><span class="Operator">-</span><span class="Identifier">d</span><span class="Punctuation">:</span><span class="Identifier">staticSqlite</span></span></tt> triggers some useful SQLite compiler options, consult sqliteral source code or <tt class="docutils literal"><span class="pre"><span class="Identifier">about</span><span class="Punctuation">(</span><span class="Punctuation">)</span></span></tt> proc for details. These can be turned off with <tt class="docutils literal"><span class="pre"><span class="Operator">-</span><span class="Identifier">d</span><span class="Punctuation">:</span><span class="Identifier">disableSqliteoptions</span></span></tt> option.</p>
+
+<h1><a class="toc-backref" id="statements-in-enum-lists" href="#statements-in-enum-lists">Statements in enum lists</a></h1><p>SQLiteral prepares statements only once, and their ordinal value in their corresponding enum list is used internally for indexing. Therefore, if you use statements from more than one enum list, the enums in other lists must be explicitly given unique ordinal values. The example above demonstrates this, where value 2 is set for the Count statement (Insert and Select implicitly get the values 0 and 1).</p>
 </p>
     <div class="section" id="7">
   <h1><a class="toc-backref" href="#7">Types</a></h1>
@@ -455,7 +434,7 @@
   </dd>
 </div>
 <div id="SQLiteralVersion">
-  <dt><pre><a href="sqliteral.html#SQLiteralVersion"><span class="Identifier">SQLiteralVersion</span></a> <span class="Other">=</span> <span class="StringLit">&quot;4.0.1&quot;</span></pre></dt>
+  <dt><pre><a href="sqliteral.html#SQLiteralVersion"><span class="Identifier">SQLiteralVersion</span></a> <span class="Other">=</span> <span class="StringLit">&quot;5.0.0&quot;</span></pre></dt>
   <dd>
     
     
@@ -587,12 +566,14 @@
 </div>
 <div id="finalizeStatements-procs-all">
   <div id="finalizeStatements">
-  <dt><pre><span class="Keyword">proc</span> <a href="#finalizeStatements"><span class="Identifier">finalizeStatements</span></a><span class="Other">(</span><span class="Other">)</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dt><pre><span class="Keyword">proc</span> <a href="#finalizeStatements"><span class="Identifier">finalizeStatements</span></a><span class="Other">(</span><span class="Other">)</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">deprecated</span><span class="Other">:</span> <span class="StringLit">&quot;Finalizations happen automatically.&quot;</span><span class="Other">,</span>
+                            <span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
-    
-    <p>Counterpart to <a class="reference internal nimdoc" title="proc prepareStatements(db: var SQLiteral; Statements: typedesc[enum])" href="#prepareStatements,SQLiteral,typedesc[]">prepareStatements</a>: Call this once just before a thread is going to get destroyed. Unlike <a class="reference internal nimdoc" title="proc prepareStatements(db: var SQLiteral; Statements: typedesc[enum])" href="#prepareStatements,SQLiteral,typedesc[]">prepareStatements</a>, this does not need to be invoked for every database, one call per thread is enough. Also unlike <a class="reference internal nimdoc" title="proc prepareStatements(db: var SQLiteral; Statements: typedesc[enum])" href="#prepareStatements,SQLiteral,typedesc[]">prepareStatements</a>, extra calls do no harm.</p>
-<p>There is some code that tries to trigger this automatically. For example, calling <a class="reference internal nimdoc" title="proc close(db: var SQLiteral)" href="#close,SQLiteral">close</a> triggers this automatically for that thread. Unfortunately this automation does not always work. In that case, you will get an &quot;unable to close due to unfinalized statements&quot; message when calling <a class="reference internal nimdoc" title="proc close(db: var SQLiteral)" href="#close,SQLiteral">close</a>, and in that case, you will have to do the finalizeStatements calls manually (see the main example for an example).</p>
+    <div class="deprecation-message">
+  <b>Deprecated:</b> Finalizations happen automatically.
+</div>
 
+    
     
   </dd>
 </div>
@@ -789,44 +770,6 @@
 </div>
 
 </div>
-<div id="json_extract-procs-all">
-  <div id="json_extract,SQLiteral,string,varargs[DbValue,toDb]">
-  <dt><pre><span class="Keyword">proc</span> <a href="#json_extract%2CSQLiteral%2Cstring%2Cvarargs%5BDbValue%2CtoDb%5D"><span class="Identifier">json_extract</span></a><span class="Other">(</span><span class="Identifier">db</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="sqliteral.html#SQLiteral"><span class="Identifier">SQLiteral</span></a><span class="Other">;</span> <span class="Identifier">path</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span>
-                  <span class="Identifier">jsonstring</span><span class="Other">:</span> <span class="Identifier">varargs</span><span class="Other">[</span><a href="sqliteral.html#DbValue"><span class="Identifier">DbValue</span></a><span class="Other">,</span> <span class="Identifier">toDb</span><span class="Other">]</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">string</span> {.
-    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">SQLError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
-  <dd>
-    
-    
-    
-  </dd>
-</div>
-
-</div>
-<div id="json_patch-procs-all">
-  <div id="json_patch,SQLiteral,string,varargs[DbValue,toDb]">
-  <dt><pre><span class="Keyword">proc</span> <a href="#json_patch%2CSQLiteral%2Cstring%2Cvarargs%5BDbValue%2CtoDb%5D"><span class="Identifier">json_patch</span></a><span class="Other">(</span><span class="Identifier">db</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="sqliteral.html#SQLiteral"><span class="Identifier">SQLiteral</span></a><span class="Other">;</span> <span class="Identifier">patch</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span>
-                <span class="Identifier">jsonstring</span><span class="Other">:</span> <span class="Identifier">varargs</span><span class="Other">[</span><a href="sqliteral.html#DbValue"><span class="Identifier">DbValue</span></a><span class="Other">,</span> <span class="Identifier">toDb</span><span class="Other">]</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">string</span> {.
-    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">SQLError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
-  <dd>
-    
-    
-    
-  </dd>
-</div>
-
-</div>
-<div id="json_valid-procs-all">
-  <div id="json_valid,SQLiteral,varargs[DbValue,toDb]">
-  <dt><pre><span class="Keyword">proc</span> <a href="#json_valid%2CSQLiteral%2Cvarargs%5BDbValue%2CtoDb%5D"><span class="Identifier">json_valid</span></a><span class="Other">(</span><span class="Identifier">db</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="sqliteral.html#SQLiteral"><span class="Identifier">SQLiteral</span></a><span class="Other">;</span> <span class="Identifier">jsonstring</span><span class="Other">:</span> <span class="Identifier">varargs</span><span class="Other">[</span><a href="sqliteral.html#DbValue"><span class="Identifier">DbValue</span></a><span class="Other">,</span> <span class="Identifier">toDb</span><span class="Other">]</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">bool</span> {.
-    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">SQLError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
-  <dd>
-    
-    
-    
-  </dd>
-</div>
-
-</div>
 <div id="openDatabase-procs-all">
   <div id="openDatabase,SQLiteral,string,string,int">
   <dt><pre><span class="Keyword">proc</span> <a href="#openDatabase%2CSQLiteral%2Cstring%2Cstring%2Cint"><span class="Identifier">openDatabase</span></a><span class="Other">(</span><span class="Identifier">db</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="sqliteral.html#SQLiteral"><span class="Identifier">SQLiteral</span></a><span class="Other">;</span> <span class="Identifier">dbname</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span> <span class="Identifier">schema</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span>
@@ -898,10 +841,14 @@
 </div>
 <div id="prepareStatements-procs-all">
   <div id="prepareStatements,SQLiteral,typedesc[]">
-  <dt><pre><span class="Keyword">proc</span> <a href="#prepareStatements%2CSQLiteral%2Ctypedesc%5B%5D"><span class="Identifier">prepareStatements</span></a><span class="Other">(</span><span class="Identifier">db</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="sqliteral.html#SQLiteral"><span class="Identifier">SQLiteral</span></a><span class="Other">;</span> <span class="Identifier">Statements</span><span class="Other">:</span> <span class="Identifier">typedesc</span><span class="Other">[</span><span class="Keyword">enum</span><span class="Other">]</span><span class="Other">)</span></pre></dt>
+  <dt><pre><span class="Keyword">proc</span> <a href="#prepareStatements%2CSQLiteral%2Ctypedesc%5B%5D"><span class="Identifier">prepareStatements</span></a><span class="Other">(</span><span class="Identifier">db</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="sqliteral.html#SQLiteral"><span class="Identifier">SQLiteral</span></a><span class="Other">;</span> <span class="Identifier">statements</span><span class="Other">:</span> <span class="Identifier">typedesc</span><span class="Other">[</span><span class="Keyword">enum</span><span class="Other">]</span><span class="Other">)</span> {.
+    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">deprecated</span><span class="Other">:</span> <span class="StringLit">&quot;Preparations happen automatically.&quot;</span></span>.}</pre></dt>
   <dd>
+    <div class="deprecation-message">
+  <b>Deprecated:</b> Preparations happen automatically.
+</div>
+
     
-    Prepares the statements given as enum parameter. Call this exactly once from every thread that is going to access the database. Main example shows how this &quot;exactly once&quot;-requirement can be achieved with a boolean threadvar.
     
   </dd>
 </div>
@@ -936,8 +883,10 @@
   <dd>
     
     <p>Set callback procedure to gather all executed statements with their parameters.</p>
+<p>If code == 10000, log concerns internal sqliteral error.</p>
 <p>If code &gt; 0, log concerns sqlite error with error code in question.</p>
-<p>If code == -1, log may be of minor interest (originating from <tt class="docutils literal"><span class="pre"><span class="Identifier">exes</span></span></tt> or statement preparation).</p>
+<p>If code == 0, log concerns normal operation.</p>
+<p>If code == -1, log is mainly for debugging purposes.</p>
 <p>Paramtruncat parameter limits the maximum log length of parameters so that long inputs won't clutter logs. Value &lt; 1 disables truncation.</p>
 <p>You can use the same logger for multiple sqliterals, the caller is also given as parameter.</p>
 
@@ -1097,19 +1046,7 @@
 <div class="section" id="15">
   <h1><a class="toc-backref" href="#15">Iterators</a></h1>
   <dl class="item">
-    <div id="json_tree-iterators-all">
-  <div id="json_tree.i,SQLiteral,varargs[DbValue,toDb]">
-  <dt><pre><span class="Keyword">iterator</span> <a href="#json_tree.i%2CSQLiteral%2Cvarargs%5BDbValue%2CtoDb%5D"><span class="Identifier">json_tree</span></a><span class="Other">(</span><span class="Identifier">db</span><span class="Other">:</span> <a href="sqliteral.html#SQLiteral"><span class="Identifier">SQLiteral</span></a><span class="Other">;</span> <span class="Identifier">jsonstring</span><span class="Other">:</span> <span class="Identifier">varargs</span><span class="Other">[</span><a href="sqliteral.html#DbValue"><span class="Identifier">DbValue</span></a><span class="Other">,</span> <span class="Identifier">toDb</span><span class="Other">]</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">PStmt</span> {.
-    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">SQLError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
-  <dd>
-    
-    
-    
-  </dd>
-</div>
-
-</div>
-<div id="rows-iterators-all">
+    <div id="rows-iterators-all">
   <div id="rows.i,SQLiteral,PStmt,varargs[DbValue,toDb]">
   <dt><pre><span class="Keyword">iterator</span> <a href="#rows.i%2CSQLiteral%2CPStmt%2Cvarargs%5BDbValue%2CtoDb%5D"><span class="Identifier">rows</span></a><span class="Other">(</span><span class="Identifier">db</span><span class="Other">:</span> <a href="sqliteral.html#SQLiteral"><span class="Identifier">SQLiteral</span></a><span class="Other">;</span> <span class="Identifier">pstatement</span><span class="Other">:</span> <span class="Identifier">PStmt</span><span class="Other">;</span> <span class="Identifier">params</span><span class="Other">:</span> <span class="Identifier">varargs</span><span class="Other">[</span><a href="sqliteral.html#DbValue"><span class="Identifier">DbValue</span></a><span class="Other">,</span> <span class="Identifier">toDb</span><span class="Other">]</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">PStmt</span> {.
     <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">SQLError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
@@ -1222,7 +1159,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2024-10-28 08:27:55 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2024-12-21 15:01:39 UTC</small>
       </div>
     </div>
   </div>

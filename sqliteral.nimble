@@ -1,6 +1,6 @@
 # Package
 
-version       = "4.0.1"
+version       = "5.0.0"
 author        = "Olli"
 description   = "A high level SQLite API for Nim"
 license       = "MIT"
