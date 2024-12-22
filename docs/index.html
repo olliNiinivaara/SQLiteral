@@ -329,14 +329,15 @@
 
 <span class="Keyword">const</span> <span class="Identifier">Schema</span> <span class="Operator">=</span> <span class="StringLit">&quot;CREATE TABLE IF NOT EXISTS Example(name TEXT NOT NULL, jsondata TEXT NOT NULL) STRICT&quot;</span>
 
-<span class="Identifier">SqlStatements</span> <span class="Operator">=</span> <span class="Keyword">enum</span>
-  <span class="Identifier">Insert</span> <span class="Operator">=</span> <span class="LongStringLit">&quot;&quot;&quot;INSERT INTO Example (name, jsondata)
-   VALUES (json_extract(?, '$.name'), json_extract(?, '$.data'))&quot;&quot;&quot;</span>
-  <span class="Identifier">Select</span> <span class="Operator">=</span> <span class="StringLit">&quot;SELECT json_extract(jsondata, '$.array') FROM Example&quot;</span>
-
-<span class="Identifier">ExtraStatements</span> <span class="Operator">=</span> <span class="Keyword">enum</span>
-  <span class="Identifier">Count</span> <span class="Operator">=</span> <span class="Punctuation">(</span><span class="DecNumber">2</span><span class="Punctuation">,</span> <span class="StringLit">&quot;SELECT count(*) FROM Example&quot;</span><span class="Punctuation">)</span>
-  <span class="Comment"># Statement ordinal values must be unique across all statements</span>
+<span class="Keyword">type</span>
+  <span class="Identifier">SqlStatements</span> <span class="Operator">=</span> <span class="Keyword">enum</span>
+    <span class="Identifier">Insert</span> <span class="Operator">=</span> <span class="LongStringLit">&quot;&quot;&quot;INSERT INTO Example (name, jsondata)
+     VALUES (json_extract(?, '$.name'), json_extract(?, '$.data'))&quot;&quot;&quot;</span>
+    <span class="Identifier">Select</span> <span class="Operator">=</span> <span class="StringLit">&quot;SELECT json_extract(jsondata, '$.array') FROM Example&quot;</span>
+  
+  <span class="Identifier">ExtraStatements</span> <span class="Operator">=</span> <span class="Keyword">enum</span>
+    <span class="Identifier">Count</span> <span class="Operator">=</span> <span class="Punctuation">(</span><span class="DecNumber">2</span><span class="Punctuation">,</span> <span class="StringLit">&quot;SELECT count(*) FROM Example&quot;</span><span class="Punctuation">)</span>
+    <span class="Comment"># Statement ordinal values must be unique across all statements</span>
 
 <span class="Keyword">let</span> <span class="Identifier">json</span> <span class="Operator">=</span> <span class="Identifier">toDb</span><span class="Punctuation">(</span><span class="LongStringLit">&quot;&quot;&quot;{&quot;name&quot;:&quot;Alice&quot;, &quot;data&quot;:{&quot;info&quot;:&quot;xxx&quot;, &quot;array&quot;:[&quot;a&quot;,&quot;b&quot;,&quot;c&quot;]}}&quot;&quot;&quot;</span><span class="Punctuation">)</span>
 
@@ -361,7 +362,7 @@
   <span class="Keyword">for</span> <span class="Identifier">i</span> <span class="Keyword">in</span> <span class="FloatNumber">0.</span><span class="Operator">.</span><span class="Identifier">high</span><span class="Punctuation">(</span><span class="Identifier">thr</span><span class="Punctuation">)</span><span class="Punctuation">:</span> <span class="Identifier">createThread</span><span class="Punctuation">(</span><span class="Identifier">thr</span><span class="Punctuation">[</span><span class="Identifier">i</span><span class="Punctuation">]</span><span class="Punctuation">,</span> <span class="Identifier">select</span><span class="Punctuation">)</span>
   <span class="Identifier">joinThreads</span><span class="Punctuation">(</span><span class="Identifier">thr</span><span class="Punctuation">)</span>
   <span class="Identifier">stdout</span><span class="Operator">.</span><span class="Identifier">flushFile</span><span class="Punctuation">(</span><span class="Punctuation">)</span>
-  <span class="Identifier">echo</span> <span class="StringLit">&quot;Selected &quot;</span> <span class="Operator">&amp;</span> <span class="Operator">$</span><span class="Punctuation">(</span><span class="DecNumber">4</span> <span class="Operator">*</span> <span class="Identifier">count</span><span class="Punctuation">)</span> <span class="Operator">&amp;</span> <span class="StringLit">&quot; arrays.&quot;</span>
+  <span class="Identifier">echo</span> <span class="StringLit">&quot;</span><span class="EscapeSequence">\n</span><span class="StringLit">Selected &quot;</span> <span class="Operator">&amp;</span> <span class="Operator">$</span><span class="Punctuation">(</span><span class="DecNumber">4</span> <span class="Operator">*</span> <span class="Identifier">count</span><span class="Punctuation">)</span> <span class="Operator">&amp;</span> <span class="StringLit">&quot; arrays.&quot;</span>
 
 <span class="Identifier">db</span><span class="Operator">.</span><span class="Identifier">openDatabase</span><span class="Punctuation">(</span><span class="StringLit">&quot;ex.db&quot;</span><span class="Punctuation">,</span> <span class="Identifier">Schema</span><span class="Punctuation">)</span>
 <span class="Identifier">run</span><span class="Punctuation">(</span><span class="Punctuation">)</span>
@@ -497,8 +498,8 @@
 </div>
 <div id="close-procs-all">
   <div id="close,SQLiteral">
-  <dt><pre><span class="Keyword">proc</span> <a href="#close%2CSQLiteral"><span class="Identifier">close</span></a><span class="Other">(</span><span class="Identifier">db</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="sqliteral.html#SQLiteral"><span class="Identifier">SQLiteral</span></a><span class="Other">)</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">SQLError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span><span class="Other">,</span>
-                                <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dt><pre><span class="Keyword">proc</span> <a href="#close%2CSQLiteral"><span class="Identifier">close</span></a><span class="Other">(</span><span class="Identifier">db</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="sqliteral.html#SQLiteral"><span class="Identifier">SQLiteral</span></a><span class="Other">)</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">SQLError</span><span class="Other">,</span> <span class="Identifier">SQLError</span><span class="Other">]</span><span class="Other">,</span>
+                                <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
     Closes the database.
@@ -793,21 +794,33 @@
 <p>If wal = true, database is opened in WAL mode with NORMAL synchronous setting.<br/>If wal = false, database is opened in PERSIST mode with FULL synchronous setting.<br/><a class="reference external" href="https://www.sqlite.org/wal.html">https://www.sqlite.org/wal.html</a><br/><a class="reference external" href="https://www.sqlite.org/pragma.html#pragma_synchronous">https://www.sqlite.org/pragma.html#pragma_synchronous</a><br/></p><p>If maxKbSize == 0, database size is limited only by OS or hardware with possibly severe consequences.</p>
 <p><tt class="docutils literal"><span class="pre"><span class="Identifier">ignorableschemaerrors</span></span></tt> is a list of error message snippets for sql errors that are to be ignored. If a clause may error, it must be given in a separate schema as its unique clause. If * is given as ignorable error, it means that all errors will be ignored.</p>
 <p>Note that by default, &quot;duplicate column name&quot; (ADD COLUMN) and &quot;no such column&quot; (DROP COLUMN) -errors will be ignored. Example below.</p>
-<pre class="listing"><span class="Keyword">const</span>
+<pre class="listing"><span class="Comment"># nim r -d:Maxdatabases=4 example.nim</span>
+<span class="Keyword">import</span> <span class="Identifier">sqliteral</span>
+
+<span class="Keyword">const</span>
   <span class="Identifier">Schema1</span> <span class="Operator">=</span> <span class="StringLit">&quot;CREATE TABLE IF NOT EXISTS Example(data TEXT NOT NULL) STRICT&quot;</span>
-  <span class="Identifier">Schema2</span> <span class="Operator">=</span> <span class="StringLit">&quot;this is to be ignored&quot;</span>
-  <span class="Identifier">Schema3</span> <span class="Operator">=</span> <span class="LongStringLit">&quot;&quot;&quot;ALTER TABLE Example ADD COLUMN newcolumn TEXT NOT NULL DEFAULT &quot;&quot;&quot;&quot;&quot;</span>
+  <span class="Identifier">Schema2</span> <span class="Operator">=</span> <span class="StringLit">&quot;this is crap&quot;</span>
+  <span class="Identifier">Schema3</span> <span class="Operator">=</span> <span class="StringLit">&quot;ALTER TABLE Example ADD COLUMN newcolumn TEXT&quot;</span>
+  <span class="Identifier">Schema4</span> <span class="Operator">=</span> <span class="StringLit">&quot;ALTER TABLE Example ADD COLUMN newcolumn TEXT&quot;</span>
 
 <span class="Keyword">var</span> <span class="Identifier">db1</span><span class="Punctuation">,</span> <span class="Identifier">db2</span><span class="Punctuation">,</span> <span class="Identifier">db3</span><span class="Punctuation">:</span> <span class="Identifier">SQLiteral</span>
 
 <span class="Keyword">proc</span> <span class="Identifier">logger</span><span class="Punctuation">(</span><span class="Identifier">db</span><span class="Punctuation">:</span> <span class="Identifier">SQLiteral</span><span class="Punctuation">,</span> <span class="Identifier">msg</span><span class="Punctuation">:</span> <span class="Identifier">string</span><span class="Punctuation">,</span> <span class="Identifier">code</span><span class="Punctuation">:</span> <span class="Identifier">int</span><span class="Punctuation">)</span> <span class="Operator">=</span> <span class="Identifier">echo</span> <span class="Identifier">msg</span>
 <span class="Identifier">db1</span><span class="Operator">.</span><span class="Identifier">setLogger</span><span class="Punctuation">(</span><span class="Identifier">logger</span><span class="Punctuation">)</span><span class="Punctuation">;</span> <span class="Identifier">db2</span><span class="Operator">.</span><span class="Identifier">setLogger</span><span class="Punctuation">(</span><span class="Identifier">logger</span><span class="Punctuation">)</span><span class="Punctuation">;</span> <span class="Identifier">db3</span><span class="Operator">.</span><span class="Identifier">setLogger</span><span class="Punctuation">(</span><span class="Identifier">logger</span><span class="Punctuation">)</span>
 
-<span class="Identifier">db1</span><span class="Operator">.</span><span class="Identifier">openDatabase</span><span class="Punctuation">(</span><span class="StringLit">&quot;example1.db&quot;</span><span class="Punctuation">,</span> <span class="Punctuation">[</span><span class="Identifier">Schema1</span><span class="Punctuation">,</span> <span class="Identifier">Schema3</span><span class="Punctuation">]</span><span class="Punctuation">)</span><span class="Punctuation">;</span> <span class="Identifier">db1</span><span class="Operator">.</span><span class="Identifier">close</span><span class="Punctuation">(</span><span class="Punctuation">)</span>
+<span class="Comment"># this will succeed because extra ADD COLUMNs are ignored:</span>
+<span class="Identifier">db1</span><span class="Operator">.</span><span class="Identifier">openDatabase</span><span class="Punctuation">(</span><span class="StringLit">&quot;example1.db&quot;</span><span class="Punctuation">,</span> <span class="Punctuation">[</span><span class="Identifier">Schema1</span><span class="Punctuation">,</span> <span class="Identifier">Schema3</span><span class="Punctuation">,</span> <span class="Identifier">Schema4</span><span class="Punctuation">]</span><span class="Punctuation">)</span><span class="Punctuation">;</span> <span class="Identifier">db1</span><span class="Operator">.</span><span class="Identifier">close</span><span class="Punctuation">(</span><span class="Punctuation">)</span>
+
+<span class="Comment"># this will succeed because suitable ignorableschemaerrors are given:</span>
 <span class="Identifier">db2</span><span class="Operator">.</span><span class="Identifier">openDatabase</span><span class="Punctuation">(</span><span class="StringLit">&quot;example2.db&quot;</span><span class="Punctuation">,</span> <span class="Punctuation">[</span><span class="Identifier">Schema1</span><span class="Punctuation">,</span> <span class="Identifier">Schema2</span><span class="Punctuation">]</span><span class="Punctuation">,</span>
- <span class="Identifier">ignorableschemaerrors</span> <span class="Operator">=</span> <span class="Punctuation">[</span><span class="LongStringLit">&quot;&quot;&quot;this&quot;: syntax error&quot;&quot;&quot;</span><span class="Punctuation">]</span><span class="Punctuation">)</span><span class="Punctuation">;</span> <span class="Identifier">db2</span><span class="Operator">.</span><span class="Identifier">close</span><span class="Punctuation">(</span><span class="Punctuation">)</span>
-<span class="Identifier">db3</span><span class="Operator">.</span><span class="Identifier">openDatabase</span><span class="Punctuation">(</span><span class="StringLit">&quot;example3.db&quot;</span><span class="Punctuation">,</span> <span class="Punctuation">[</span><span class="Identifier">Schema1</span><span class="Punctuation">,</span> <span class="Identifier">Schema2</span><span class="Punctuation">,</span> <span class="Identifier">Schema3</span><span class="Punctuation">]</span><span class="Punctuation">,</span>
- <span class="Identifier">ignorableschemaerrors</span> <span class="Operator">=</span> <span class="Punctuation">[</span><span class="StringLit">&quot;*&quot;</span><span class="Punctuation">]</span><span class="Punctuation">)</span><span class="Punctuation">;</span> <span class="Identifier">db3</span><span class="Operator">.</span><span class="Identifier">close</span><span class="Punctuation">(</span><span class="Punctuation">)</span></pre>
+  <span class="Identifier">ignorableschemaerrors</span> <span class="Operator">=</span> <span class="Punctuation">[</span><span class="LongStringLit">&quot;&quot;&quot;this&quot;: syntax error&quot;&quot;&quot;</span><span class="Punctuation">]</span><span class="Punctuation">)</span><span class="Punctuation">;</span> <span class="Identifier">db2</span><span class="Operator">.</span><span class="Identifier">close</span><span class="Punctuation">(</span><span class="Punctuation">)</span>
+
+<span class="Comment"># this will succeed because all schema errors are ignored:</span>
+<span class="Identifier">db3</span><span class="Operator">.</span><span class="Identifier">openDatabase</span><span class="Punctuation">(</span><span class="StringLit">&quot;example1.db&quot;</span><span class="Punctuation">,</span> <span class="Punctuation">[</span><span class="Identifier">Schema1</span><span class="Punctuation">,</span> <span class="Identifier">Schema2</span><span class="Punctuation">,</span> <span class="Identifier">Schema3</span><span class="Punctuation">]</span><span class="Punctuation">,</span>
+  <span class="Identifier">ignorableschemaerrors</span> <span class="Operator">=</span> <span class="Punctuation">[</span><span class="StringLit">&quot;*&quot;</span><span class="Punctuation">]</span><span class="Punctuation">)</span><span class="Punctuation">;</span> <span class="Identifier">db3</span><span class="Operator">.</span><span class="Identifier">close</span><span class="Punctuation">(</span><span class="Punctuation">)</span>
+
+<span class="Comment"># this will fail because Schema 2 has syntax error:</span>
+<span class="Identifier">db1</span><span class="Operator">.</span><span class="Identifier">openDatabase</span><span class="Punctuation">(</span><span class="StringLit">&quot;example1.db&quot;</span><span class="Punctuation">,</span> <span class="Punctuation">[</span><span class="Identifier">Schema1</span><span class="Punctuation">,</span> <span class="Identifier">Schema2</span><span class="Punctuation">]</span><span class="Punctuation">)</span></pre>
     
   </dd>
 </div>
@@ -1159,7 +1172,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2024-12-21 15:01:39 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2024-12-22 14:24:54 UTC</small>
       </div>
     </div>
   </div>
