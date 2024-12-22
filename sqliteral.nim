@@ -7,10 +7,10 @@ when not defined(nimdoc) and not defined(gcDestructors): {.fatal: "mm:arc or mm:
 
 ## A high level SQLite API with support for multi-threading, prepared statements,
 ## proper typing, zero-copy data paths, debugging, optimizing, backups, and more.
-## 
+##  
 ## Example
 ## =======
-##
+##  
 ## .. code-block:: Nim
 ##  
 ##  
@@ -18,14 +18,15 @@ when not defined(nimdoc) and not defined(gcDestructors): {.fatal: "mm:arc or mm:
 ##  
 ##  const Schema = "CREATE TABLE IF NOT EXISTS Example(name TEXT NOT NULL, jsondata TEXT NOT NULL) STRICT"
 ##  
-##  SqlStatements = enum
-##    Insert = """INSERT INTO Example (name, jsondata)
-##     VALUES (json_extract(?, '$.name'), json_extract(?, '$.data'))"""
-##    Select = "SELECT json_extract(jsondata, '$.array') FROM Example"
+##  type
+##    SqlStatements = enum
+##      Insert = """INSERT INTO Example (name, jsondata)
+##       VALUES (json_extract(?, '$.name'), json_extract(?, '$.data'))"""
+##      Select = "SELECT json_extract(jsondata, '$.array') FROM Example"
 ##  
-##  ExtraStatements = enum 
-##    Count = (2, "SELECT count(*) FROM Example")
-##    # Statement ordinal values must be unique across all statements
+##    ExtraStatements = enum 
+##      Count = (2, "SELECT count(*) FROM Example")
+##      # Statement ordinal values must be unique across all statements
 ##  
 ##  let json = toDb("""{"name":"Alice", "data":{"info":"xxx", "array":["a","b","c"]}}""")
 ##  
@@ -35,12 +36,12 @@ when not defined(nimdoc) and not defined(gcDestructors): {.fatal: "mm:arc or mm:
 ##  proc select() =
 ##    {.gcsafe.}:
 ##      for row in db.rows(Select): stdout.write(row.getCString(0))
-##
+##  
 ##  proc run() =
 ##    echo "inserting 10000 rows..."
 ##    db.transaction:
 ##      for i in 1 .. 10000: discard db.insert(Insert, json, json)
-##    
+##  
 ##    let count = db.getTheInt(Count)
 ##    echo "10000 more rows inserted."
 ##    echo "Press <Enter> to select from the all existing ", count, " rows in 4 parallel threads..."
@@ -50,7 +51,7 @@ when not defined(nimdoc) and not defined(gcDestructors): {.fatal: "mm:arc or mm:
 ##    for i in 0..high(thr): createThread(thr[i], select)
 ##    joinThreads(thr)
 ##    stdout.flushFile()
-##    echo "Selected " & $(4 * count) & " arrays."
+##    echo "\nSelected " & $(4 * count) & " arrays."
 ##  
 ##  db.openDatabase("ex.db", Schema)
 ##  run()
@@ -108,13 +109,13 @@ const
     ## Compile time define pragma that limits amount of prepared statements
   MaxDatabases* {.intdefine.} = 2
     ## Compile time define pragma that limits amount of databases
-    
-  
+
+
 type
   SQLError* = ref object of CatchableError
     ## https://www.sqlite.org/rescode.html
     rescode*: int
-  
+
   SQLiteral* = object
     sqlite*: PSqlite3
     dbname*: string
@@ -137,7 +138,7 @@ type
     sqliteReal,
     sqliteText,
     sqliteBlob
-  
+
   DbValue* = object
     ## | Represents a value in a SQLite database.
     ## | https://www.sqlite.org/datatype3.html
@@ -198,7 +199,7 @@ proc toDb*[T: Ordinal](val: T): DbValue {.inline.} = DbValue(kind: sqliteInteger
 proc toDb*[T: SomeFloat](val: T): DbValue {.inline.} = DbValue(kind: sqliteReal, floatVal: val.float64)
 
 proc toDb*(val: seq[byte]): DbValue {.inline.} = DbValue(kind: sqliteBlob, blobVal: val)
-  
+
 proc toDb*[T: DbValue](val: T): DbValue {.inline.} = val
 
 
@@ -220,13 +221,13 @@ proc getStatement(db: SQLiteral, statement: enum): PStmt =
   result = preparedstatements[db.index * MaxStatements + ord(statement)]
   if likely(result != nil): return result
   let index = ord(statement)
-  if(unlikely) index >= MaxStatements:
+  if unlikely(index >= MaxStatements):
     let problem = "Index " & $index & " of '" & $statement & "' larger than MaxStatements = " & $MaxStatements 
     if db.loggerproc != nil: db.loggerproc(db, problem, 10000)
     raise SQLError(msg: db.dbname & " " & problem, rescode: 10000)
   result = prepareSql(db, ($statement).cstring)
   preparedstatements[db.index * MaxStatements + index] = result
-  if unlikely(not allpreparedstatements.contains(addr preparedstatements)):
+  if not allpreparedstatements.contains(addr preparedstatements):
     allpreparedstatements.add(addr preparedstatements)
   if db.loggerproc != nil:
     db.loggerproc(db, "Prepared for thread " & $getThreadId() & ": " & $statement, -1)
@@ -320,7 +321,7 @@ iterator rows*(db: SQLiteral, statement: enum, params: varargs[DbValue, toDb]): 
 
 iterator rows*(db: SQLiteral, pstatement: Pstmt, params: varargs[DbValue, toDb]): PStmt =
   ## Iterates over the query results
-  if(unlikely) db.loggerproc != nil: db.doLog("Pstmt rows", params)
+  if db.loggerproc != nil: db.doLog("Pstmt rows", params)
   checkRc(db, bindParams(pstatement, params))
   defer: discard sqlite3.reset(pstatement)
   while step(pstatement) == SQLITE_ROW: yield pstatement
@@ -330,7 +331,7 @@ proc getTheInt*(db: SQLiteral, statement: enum, params: varargs[DbValue, toDb]):
   ## | Executes query and returns value of INTEGER -type column at column index 0 of first result row.
   ## | If query does not return any rows, returns -2147483647 (low(int32) + 1).
   ## | Automatically resets the statement.
-  if(unlikely) db.loggerproc != nil: log()
+  if db.loggerproc != nil: log()
   let s = db.getStatement(statement)
   checkRc(db, bindParams(s, params))
   defer: discard sqlite3.reset(s)
@@ -342,7 +343,7 @@ proc getTheInt*(db: SQLiteral, s: string): int64 {.inline.} =
   ## column at column index 0 of first result row.
   ## | If query does not return any rows, returns -2147483647 (low(int32) + 1).
   ## | For security and performance reasons, this proc should be used with caution.
-  if(unlikely) db.loggerproc != nil: db.loggerproc(db, s, 0)
+  if db.loggerproc != nil: db.loggerproc(db, s, 0)
   let query = db.prepareSql(s)
   try:
     let rc = step(query)
@@ -356,7 +357,7 @@ proc getTheString*(db: SQLiteral, statement: enum, params: varargs[DbValue, toDb
   ## | Executes query and returns value of TEXT -type column at column index 0 of first result row.
   ## | If query does not return any rows, returns empty string.
   ## | Automatically resets the statement.
-  if(unlikely) db.loggerproc != nil: log()
+  if db.loggerproc != nil: log()
   let s = db.getStatement(statement)
   checkRc(db, bindParams(s, params))
   defer: discard sqlite3.reset(s)
@@ -368,7 +369,7 @@ proc getTheString*(db: SQLiteral, s: string): string {.inline.} =
   ## column at column index 0 of first result row.
   ## | If query does not return any rows, returns empty string.
   ## | For security and performance reasons, this proc should be used with caution.
-  if(unlikely) db.loggerproc != nil: db.loggerproc(db, s, 0)
+  if db.loggerproc != nil: db.loggerproc(db, s, 0)
   let query = db.prepareSql(s)
   try:
     let rc = step(query)
@@ -385,7 +386,7 @@ proc getLastInsertRowid*(db: SQLiteral): int64 {.inline.} =
 
 proc rowExists*(db: SQLiteral, statement: enum, params: varargs[DbValue, toDb]): bool {.inline.} =
   ## Returns true if query returns any rows
-  if(unlikely) db.loggerproc != nil: log()
+  if db.loggerproc != nil: log()
   let s = db.getStatement(statement)
   checkRc(db, bindParams(s, params))
   defer: discard sqlite3.reset(s)
@@ -395,7 +396,7 @@ proc rowExists*(db: SQLiteral, statement: enum, params: varargs[DbValue, toDb]):
 proc rowExists*(db: SQLiteral, sql: string): bool {.inline.} =
   ## | Returns true if query returns any rows.
   ## | For security reasons, this proc should be used with caution.
-  if(unlikely) db.loggerproc != nil: db.loggerproc(db, sql, 0)
+  if db.loggerproc != nil: db.loggerproc(db, sql, 0)
   let preparedstatement = db.prepareSql(sql.cstring)
   defer: discard finalize(preparedstatement)
   return step(preparedstatement) == SQLITE_ROW
@@ -403,10 +404,10 @@ proc rowExists*(db: SQLiteral, sql: string): bool {.inline.} =
 
 template withRow*(db: SQLiteral, sql: string, row, body: untyped) =
   ## | Dynamically prepares and finalizes an sql query.
-  ## | Name for the resulting prepared statement is given with row parameter.  
+  ## | Name for the resulting prepared statement is given with row parameter.
   ## | The code block will be executed only if query returns a row.
   ## | For security and performance reasons, this proc should be used with caution.
-  if(unlikely) db.loggerproc != nil: db.loggerproc(db, sql, 0)
+  if db.loggerproc != nil: db.loggerproc(db, sql, 0)
   let preparedstatement = prepareSql(db, sql.cstring)
   try:
     if step(preparedstatement) == SQLITE_ROW:
@@ -418,7 +419,7 @@ template withRow*(db: SQLiteral, sql: string, row, body: untyped) =
 
 template withRowOr*(db: SQLiteral, sql: string, row, body1, body2: untyped) =
   ## | Dynamically prepares and finalizes an sql query.
-  ## | Name for the resulting prepared statement is given with row parameter.  
+  ## | Name for the resulting prepared statement is given with row parameter.
   ## | First block will be executed if query returns a row, otherwise the second block.
   ## | For security and performance reasons, this proc should be used with caution.
   ## **Example:**
@@ -430,7 +431,7 @@ template withRowOr*(db: SQLiteral, sql: string, row, body1, body2: untyped) =
   ##  do:
   ##    echo "we have a fresh database"
   ## 
-  if(unlikely) db.loggerproc != nil: db.loggerproc(db, sql, 0)
+  if db.loggerproc != nil: db.loggerproc(db, sql, 0)
   let preparedstatement = prepareSql(db, sql.cstring)
   try:
     if step(preparedstatement) == SQLITE_ROW:
@@ -445,20 +446,20 @@ template withRow*(db: SQLiteral, statement: enum, params: varargs[DbValue, toDb]
   ## | Executes given statement.
   ## | Name for the prepared statement is given with row parameter.
   ## | The code block will be executed only if query returns a row.
-  if(unlikely) db.loggerproc != nil: doLog(db, $statement, params)
+  if db.loggerproc != nil: doLog(db, $statement, params)
   let s = db.getStatement(statement)
   defer: discard reset(s)
   checkRc(db, bindParams(s, params))
   if step(s) == SQLITE_ROW:
     var row {.inject.} = s
     body
-    
+
 
 template withRowOr*(db: SQLiteral, statement: enum, params: varargs[DbValue, toDb], row, body1, body2: untyped) =
   ## | Executes given statement.
-  ## | Name for the prepared statement is given with row parameter.  
+  ## | Name for the prepared statement is given with row parameter.
   ## | First block will be executed if query returns a row, otherwise the second block.
-  if(unlikely) db.loggerproc != nil: doLog(db, $statement, params)
+  if db.loggerproc != nil: doLog(db, $statement, params)
   let s = db.getStatement(statement)
   checkRc(db, bindParams(s, params))
   try:
@@ -473,7 +474,7 @@ template withRowOr*(db: SQLiteral, statement: enum, params: varargs[DbValue, toD
 
 proc exec*(db: SQLiteral, pstatement: Pstmt, params: varargs[DbValue, toDb]) {.inline.} =
   ## Executes given prepared statement
-  if(unlikely) db.loggerproc != nil: db.doLog("exec Pstmt", params)
+  if db.loggerproc != nil: db.doLog("exec Pstmt", params)
   defer: discard sqlite3.reset(pstatement)
   checkRc(db, bindParams(pstatement, params))
   checkRc(db, step(pstatement))
@@ -481,7 +482,7 @@ proc exec*(db: SQLiteral, pstatement: Pstmt, params: varargs[DbValue, toDb]) {.i
 
 proc exec*(db: SQLiteral, statement: enum, params: varargs[DbValue, toDb]) {.inline.} =
   ## Executes given statement
-  if(unlikely) db.loggerproc != nil: log()
+  if db.loggerproc != nil: log()
   let s = db.getStatement(statement)
   defer: discard sqlite3.reset(s)
   checkRc(db, bindParams(s, params))
@@ -491,7 +492,7 @@ proc exec*(db: SQLiteral, statement: enum, params: varargs[DbValue, toDb]) {.inl
 proc exes*(db: SQLiteral, sql: string) =
   ## | Prepares, executes and finalizes given semicolon-separated sql statements.
   ## | For security and performance reasons, this proc should be used with caution.
-  if(unlikely) db.loggerproc != nil: db.loggerproc(db, sql, -1)
+  if db.loggerproc != nil: db.loggerproc(db, sql, -1)
   var errormsg: cstring
   let rescode = sqlite3.exec(db.sqlite, sql.cstring, nil, nil, errormsg)
   if rescode != 0:
@@ -499,14 +500,14 @@ proc exes*(db: SQLiteral, sql: string) =
     if errormsg != nil:
       error = $errormsg
       free(errormsg)
-    if(unlikely) db.loggerproc != nil: db.loggerproc(db, error, rescode)
+    if db.loggerproc != nil: db.loggerproc(db, error, rescode)
     raise SQLError(msg: db.dbname & " " & $rescode & " " & error, rescode: rescode)
 
 
 proc insert*(db: SQLiteral, statement: enum, params: varargs[DbValue, toDb]): int64 {.inline.} =
   ## | Executes given statement and, if succesful, returns db.getLastinsertRowid().
   ## | If not succesful, returns -2147483647 (low(int32) + 1).
-  if(unlikely) db.loggerproc != nil: log()
+  if db.loggerproc != nil: log()
   let s = db.getStatement(statement)
   defer: discard sqlite3.reset(s)
   checkRc(db, bindParams(s, params))
@@ -522,7 +523,7 @@ proc update*(db: SQLiteral, sql: string, column: string, newvalue: DbValue, wher
   if column.find(' ') != -1: raise (ref Exception)(msg: "Column must not contain spaces: " & column)
   let update = sql.replace("Column", column).cstring
   var pstmt: PStmt
-  if(unlikely) db.loggerproc != nil: db.loggerproc(db, $update & " (" & $newvalue & ", " & $where & ")", 0)
+  if db.loggerproc != nil: db.loggerproc(db, $update & " (" & $newvalue & ", " & $where & ")", 0)
   checkRc(db, prepare_v2(db.sqlite, update, update.len.cint, pstmt, nil))
   try:
     db.exec(pstmt, newvalue, where)
@@ -536,14 +537,14 @@ proc columnExists*(db: SQLiteral, table: string, column: string): bool =
   if table.find(' ') != -1: raise (ref Exception)(msg: "Table must not contain spaces: " & table)
   if column.find(' ') != -1: raise (ref Exception)(msg: "Column must not contain spaces: " & column)
   let sql = ("SELECT count(*) FROM pragma_table_info('" & table & "') WHERE name = '" & column & "'").cstring
-  if(unlikely) db.loggerproc != nil: db.loggerproc(db, $sql, 0)
+  if db.loggerproc != nil: db.loggerproc(db, $sql, 0)
   let pstmt = db.prepareSql(sql)
   try:
     if step(pstmt) == SQLITE_ROW: result = pstmt.getInt(0) == 1
   finally:
     discard sqlite3.reset(pstmt)
     discard pstmt.finalize()
-  
+
 
 template transaction*(db: var SQLiteral, body: untyped) =
   ## | Every write to database must happen inside some transaction.
@@ -553,11 +554,11 @@ template transaction*(db: var SQLiteral, body: untyped) =
     acquire(db.transactionlock)
     exec(db, db.Transaction)
     db.intransaction = true
-    if(unlikely) db.loggerproc != nil: db.loggerproc(db, "--- BEGIN TRANSACTION", 0)
+    if db.loggerproc != nil: db.loggerproc(db, "--- BEGIN TRANSACTION", 0)
     try: body
     except CatchableError as ex:
       exec(db, db.Rollback)
-      if(unlikely) db.loggerproc != nil: db.loggerproc(db, "--- ROLLBACK", 0)
+      if db.loggerproc != nil: db.loggerproc(db, "--- ROLLBACK", 0)
       db.intransaction = false
       raise ex
     finally:
@@ -565,18 +566,18 @@ template transaction*(db: var SQLiteral, body: untyped) =
         exec(db, db.Commit)
         if db.oncommitproc != nil: db.oncommitproc(db)
         db.intransaction = false
-        if(unlikely) db.loggerproc != nil: db.loggerproc(db, "--- COMMIT", 0)
+        if db.loggerproc != nil: db.loggerproc(db, "--- COMMIT", 0)
       release(db.transactionlock)
 
 
 template transactionsDisabled*(db: var SQLiteral, body: untyped) =
   ## Executes `body` in between transactions (ie. does not start transaction, but transactions are blocked during this operation).
   acquire(db.transactionlock)
-  if(unlikely) db.loggerproc != nil: db.loggerproc(db, "--- TRANSACTIONS DISABLED", 0)
+  if db.loggerproc != nil: db.loggerproc(db, "--- TRANSACTIONS DISABLED", 0)
   try:
     body
   finally:
-    if(unlikely) db.loggerproc != nil: db.loggerproc(db, "--- TRANSACTIONS ENABLED", 0)
+    if db.loggerproc != nil: db.loggerproc(db, "--- TRANSACTIONS ENABLED", 0)
     release(db.transactionlock)
 
 
@@ -632,25 +633,37 @@ proc openDatabase*(db: var SQLiteral, dbname: string, schemas: openArray[string]
   ##
   ## .. code-block:: Nim
   ## 
+  ##  # nim r -d:Maxdatabases=4 example.nim
+  ##  import sqliteral
+  ##  
   ##  const
   ##    Schema1 = "CREATE TABLE IF NOT EXISTS Example(data TEXT NOT NULL) STRICT"
-  ##    Schema2 = "this is to be ignored"
-  ##    Schema3 = """ALTER TABLE Example ADD COLUMN newcolumn TEXT NOT NULL DEFAULT """""
-  ## 
+  ##    Schema2 = "this is crap"
+  ##    Schema3 = "ALTER TABLE Example ADD COLUMN newcolumn TEXT"
+  ##    Schema4 = "ALTER TABLE Example ADD COLUMN newcolumn TEXT"
+  ##   
   ##  var db1, db2, db3: SQLiteral
-  ## 
+  ##  
   ##  proc logger(db: SQLiteral, msg: string, code: int) = echo msg
   ##  db1.setLogger(logger); db2.setLogger(logger); db3.setLogger(logger)
-  ## 
-  ##  db1.openDatabase("example1.db", [Schema1, Schema3]); db1.close()
+  ##  
+  ##  # this will succeed because extra ADD COLUMNs are ignored:
+  ##  db1.openDatabase("example1.db", [Schema1, Schema3, Schema4]); db1.close()
+  ##  
+  ##  # this will succeed because suitable ignorableschemaerrors are given:
   ##  db2.openDatabase("example2.db", [Schema1, Schema2],
-  ##   ignorableschemaerrors = ["""this": syntax error"""]); db2.close()
-  ##  db3.openDatabase("example3.db", [Schema1, Schema2, Schema3],
-  ##   ignorableschemaerrors = ["*"]); db3.close()
-  ## 
+  ##    ignorableschemaerrors = ["""this": syntax error"""]); db2.close()
+  ##  
+  ##  # this will succeed because all schema errors are ignored:  
+  ##  db3.openDatabase("example1.db", [Schema1, Schema2, Schema3],
+  ##    ignorableschemaerrors = ["*"]); db3.close()
+  ##  
+  ##  # this will fail because Schema 2 has syntax error:
+  ##  db1.openDatabase("example1.db", [Schema1, Schema2])
+  ##  
   doAssert dbname != ""
   withLock(openlock):
-    if nextdbindex == MaxDatabases: raiseAssert("Cannot create more than " & $MaxDatabases & " databases. Increase the MaxDatabases intdefine.")
+    if nextdbindex == MaxDatabases: raiseAssert("Cannot open more than " & $MaxDatabases & " databases. Increase the MaxDatabases intdefine.")
     db.index = nextdbindex
     nextdbindex += 1
   initLock(db.transactionlock)
@@ -680,7 +693,7 @@ proc openDatabase*(db: var SQLiteral, dbname: string, schemas: openArray[string]
   db.Commit = db.prepareSql("COMMIT".cstring)
   db.Rollback = db.prepareSql("ROLLBACK".cstring)
   if db.loggerproc != nil: db.loggerproc(db, db.dbname & " opened", -1)
-  
+
 
 proc openDatabase*(db: var SQLiteral, dbname: string, schema: string, maxKbSize = 0, wal = true) {.inline.} =
   ## Open database with a single schema.
@@ -697,7 +710,7 @@ proc finalizeAllStatements() =
       if threadpreparedstatements[][i] != nil:
         discard threadpreparedstatements[][i].finalize()
         threadpreparedstatements[][i] = nil
-    
+
 
 proc setReadonly*(db: var SQLiteral, readonly: bool) =
   ## When in readonly mode:
@@ -723,8 +736,8 @@ proc setReadonly*(db: var SQLiteral, readonly: bool) =
       if db.walmode: db.exes("PRAGMA journal_mode = WAL")
       db.exes("PRAGMA locking_mode = EXCLUSIVE") # next write will keep the file lock
       db.inreadonlymode = readonly
-    if(unlikely) db.loggerproc != nil: db.loggerproc(db, "--- READONLY MODE: " & $readonly , 0)
-    
+    if db.loggerproc != nil: db.loggerproc(db, "--- READONLY MODE: " & $readonly , 0)
+
 
 proc optimize*(db: var SQLiteral, pagesize = -1, walautocheckpoint = -1) =
   ## Vacuums and optimizes the database.
@@ -735,13 +748,13 @@ proc optimize*(db: var SQLiteral, pagesize = -1, walautocheckpoint = -1) =
   ## | https://sqlite.org/pragma.html#pragma_page_size
   ## | https://www.sqlite.org/pragma.html#pragma_wal_checkpoint
   acquire(db.transactionlock)
-  try:   
+  try:
     db.exes("PRAGMA optimize")
     if walautocheckpoint > -1: db.exes("PRAGMA wal_autocheckpoint = " & $walautocheckpoint)
     if pagesize > -1:
       db.exes("PRAGMA journal_mode = PERSIST")
-      db.exes("PRAGMA page_size = " & $pagesize)  
-    db.exes("VACUUM")      
+      db.exes("PRAGMA page_size = " & $pagesize)
+    db.exes("VACUUM")
     if pagesize > -1 and db.walmode: db.exes("PRAGMA journal_mode = WAL")
   except:
     if db.loggerproc != nil: db.loggerproc(db, getCurrentExceptionMsg(), 10000)
@@ -774,7 +787,7 @@ proc stepBackup*(db: var SQLiteral, backupdb: Psqlite3, backuphandle: PSqlite3_B
   ## **Example:**
   ## 
   ## .. code-block:: Nim
-  ##  
+  ##
   ##  from os import sleep 
   ##  let (backupdb , backuphandle) = db.initBackup("./backup.db")
   ##  var progress: int
@@ -804,12 +817,13 @@ proc cancelBackup*(db: var SQLiteral, backupdb: Psqlite3, backuphandle: PSqlite3
   if unlikely(backupdb == nil or backuphandle == nil): db.checkRc(SQLITE_NULL)
   discard backup_finish(backuphandle)
   discard backupdb.close()
-  discard db.backupsinprogress.atomicDec  
+  discard db.backupsinprogress.atomicDec
   if db.loggerproc != nil: db.loggerproc(db, "backup canceled", 0)
-  
+
 
 proc inMemory(db: SQLiteral): bool =
   db.dbname == ":memory:"
+
 
 proc about*(db: SQLiteral) =
   ## Echoes some info about the database.
@@ -861,7 +875,7 @@ else:
 proc interrupt*(db: var SQLiteral) =
   ## Interrupts long running operations by calling https://www.sqlite.org/c3ref/interrupt.html
   callInterrupt(db.sqlite)
-  
+
 
 proc close*(db: var SQLiteral) =
   ## Closes the database.
@@ -883,8 +897,8 @@ proc close*(db: var SQLiteral) =
       if db.loggerproc != nil: db.loggerproc(db, db.dbname & " closed", 0)
     else: db.checkRc(rc)
   except:
-    if db.loggerproc == nil: echo "Could not close ", db.dbname, ": ", getCurrentExceptionMsg()
-    elif rc == 0: db.loggerproc(db, getCurrentExceptionMsg(), 10000)
+    if db.loggerproc != nil: db.loggerproc(db, getCurrentExceptionMsg(), 10000)
+    raise SQLError(msg: getCurrentExceptionMsg(), rescode: 10000)
   finally:
     release(db.transactionlock)
     if db.Transaction == nil: deinitLock(db.transactionlock)

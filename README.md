@@ -8,12 +8,13 @@ zero-copy data paths, debugging, optimizing, backups, and more...
 
 http://olliNiinivaara.github.io/SQLiteral/
 
-## 5.0.0 Release notes (2024-12-21)
- * Statements from more than one enum list can be used
- * Statements are prepared automatically on first use
- * Statements are finalized automatically on close
+## 5.0.0 Release notes (2024-12-22)
+ * statements from more than one enum list can be used
+ * a statement is prepared automatically on first use
+ * all used statements are finalized automatically on close
  * only the Nim default memory managers (ARC and ORC family) are supported
  * errors that are not sqlite errors are logged with error code 10000
+ * failing to close raises an SQLError
  * json_extract, json_patch, json_valid, and json_tree procs removed as too high level (esp. now that multiple statement lists are supported)
 
 ## Example
