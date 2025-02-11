@@ -442,17 +442,31 @@ template withRowOr*(db: SQLiteral, sql: string, row, body1, body2: untyped) =
     discard finalize(preparedstatement)
 
 
-template withRow*(db: SQLiteral, statement: enum, params: varargs[DbValue, toDb], row, body: untyped) {.dirty.} =
+template withRow*(db: SQLiteral, statement: enum, params: varargs[DbValue, toDb], row, body: untyped) =
+  ## | Executes given statement.
+  ## | Name for the prepared statement is given with row parameter.
+  ## | First block will be executed if query returns a row, otherwise the second block.
+  if db.loggerproc != nil: doLog(db, $statement, params)
+  let s = db.getStatement(statement)
+  checkRc(db, bindParams(s, params))
+  try:
+    if step(s) == SQLITE_ROW:
+      var row {.inject.} = s
+      body
+    #else: body2
+  finally:
+    discard sqlite3.reset(s) 
+  
   ## | Executes given statement.
   ## | Name for the prepared statement is given with row parameter.
   ## | The code block will be executed only if query returns a row.
-  if db.loggerproc != nil: doLog(db, $statement, params)
-  let s = db.getStatement(statement)
-  defer: discard reset(s)
-  checkRc(db, bindParams(s, params))
-  if step(s) == SQLITE_ROW:
-    var row {.inject.} = s
-    body
+  #if db.loggerproc != nil: doLog(db, $statement, params)
+  #let s = db.getStatement(statement)
+  #defer: discard reset(s)
+  #checkRc(db, bindParams(s, params))
+  #if step(s) == SQLITE_ROW:
+  #  var row {.inject.} = s
+  #  body
 
 
 template withRowOr*(db: SQLiteral, statement: enum, params: varargs[DbValue, toDb], row, body1, body2: untyped) =
