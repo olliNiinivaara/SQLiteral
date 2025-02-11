@@ -7,68 +7,68 @@ when not defined(nimdoc) and not defined(gcDestructors): {.fatal: "mm:arc or mm:
 
 ## A high level SQLite API with support for multi-threading, prepared statements,
 ## proper typing, zero-copy data paths, debugging, optimizing, backups, and more.
-##  
+##
 ## Example
 ## =======
-##  
+##
 ## .. code-block:: Nim
-##  
-##  
+##
+##
 ##  import sqliteral
-##  
+##
 ##  const Schema = "CREATE TABLE IF NOT EXISTS Example(name TEXT NOT NULL, jsondata TEXT NOT NULL) STRICT"
-##  
+##
 ##  type
 ##    SqlStatements = enum
 ##      Insert = """INSERT INTO Example (name, jsondata)
 ##       VALUES (json_extract(?, '$.name'), json_extract(?, '$.data'))"""
 ##      Select = "SELECT json_extract(jsondata, '$.array') FROM Example"
-##  
-##    ExtraStatements = enum 
+##
+##    ExtraStatements = enum
 ##      Count = (2, "SELECT count(*) FROM Example")
 ##      # Statement ordinal values must be unique across all statements
-##  
+##
 ##  let json = toDb("""{"name":"Alice", "data":{"info":"xxx", "array":["a","b","c"]}}""")
-##  
+##
 ##  var db: SQLiteral
 ##  when not defined(release): db.setLogger(proc(db: SQLiteral, msg: string, code: int) = echo msg)
-##  
+##
 ##  proc select() =
 ##    {.gcsafe.}:
 ##      for row in db.rows(Select): stdout.write(row.getCString(0))
-##  
+##
 ##  proc run() =
 ##    echo "inserting 10000 rows..."
 ##    db.transaction:
 ##      for i in 1 .. 10000: discard db.insert(Insert, json, json)
-##  
+##
 ##    let count = db.getTheInt(Count)
 ##    echo "10000 more rows inserted."
 ##    echo "Press <Enter> to select from the all existing ", count, " rows in 4 parallel threads..."
 ##    discard stdin.readChar()
-##  
+##
 ##    var thr: array[4, Thread[void]]
 ##    for i in 0..high(thr): createThread(thr[i], select)
 ##    joinThreads(thr)
 ##    stdout.flushFile()
 ##    echo "\nSelected " & $(4 * count) & " arrays."
-##  
+##
 ##  db.openDatabase("ex.db", Schema)
 ##  run()
 ##  db.close()
-##  
-##  
+##
+##
 ## Compiling with sqlite3.c
 ## ========================
-## 
+##
 ## | First, sqlite3.c amalgamation must be on compiler search path.
 ## | You can extract it from a zip available at https://www.sqlite.org/download.html.
 ## | Then, `-d:staticSqlite`compiler option must be used.
-## 
+##
 ## For your convenience, `-d:staticSqlite` triggers some useful SQLite compiler options,
 ## consult sqliteral source code or `about()` proc for details.
 ## These can be turned off with `-d:disableSqliteoptions` option.
-##   
+##
 ## Statements in enum lists
 ## ========================
 ##
@@ -123,7 +123,7 @@ type
     backupsinprogress*: int
     index: int
     intransaction: bool
-    walmode: bool 
+    walmode: bool
     maxsize: int
     transactionlock: Lock
     loggerproc: proc(sqliteral: SQLiteral, statement: string, errorcode: int) {.gcsafe, raises: [].}
@@ -167,7 +167,7 @@ template checkRc*(db: SQLiteral, resultcode: int) =
   ## | Raises SQLError if resultcode notin SQLITE_OK, SQLITE_ROW, SQLITE_DONE
   ## | https://www.sqlite.org/rescode.html
   if resultcode notin [SQLITE_OK, SQLITE_ROW, SQLITE_DONE]:
-    let errormsg = 
+    let errormsg =
       if resultcode == 10000: "Sqliteral error"
       else: $errmsg(db.sqlite)
     if db.loggerproc != nil: db.loggerproc(db, errormsg, resultcode)
@@ -203,7 +203,7 @@ proc toDb*(val: seq[byte]): DbValue {.inline.} = DbValue(kind: sqliteBlob, blobV
 proc toDb*[T: DbValue](val: T): DbValue {.inline.} = val
 
 
-proc `$`*[T: DbValue](val: T): string {.inline.} = 
+proc `$`*[T: DbValue](val: T): string {.inline.} =
   case val.kind
   of sqliteInteger: $val.intVal
   of sqliteReal: $val.floatVal
@@ -222,7 +222,7 @@ proc getStatement(db: SQLiteral, statement: enum): PStmt =
   if likely(result != nil): return result
   let index = ord(statement)
   if unlikely(index >= MaxStatements):
-    let problem = "Index " & $index & " of '" & $statement & "' larger than MaxStatements = " & $MaxStatements 
+    let problem = "Index " & $index & " of '" & $statement & "' larger than MaxStatements = " & $MaxStatements
     if db.loggerproc != nil: db.loggerproc(db, problem, 10000)
     raise SQLError(msg: db.dbname & " " & problem, rescode: 10000)
   result = prepareSql(db, ($statement).cstring)
@@ -423,14 +423,14 @@ template withRowOr*(db: SQLiteral, sql: string, row, body1, body2: untyped) =
   ## | First block will be executed if query returns a row, otherwise the second block.
   ## | For security and performance reasons, this proc should be used with caution.
   ## **Example:**
-  ## 
+  ##
   ## .. code-block:: Nim
-  ## 
+  ##
   ##  db.withRowOr("SELECT (1) FROM sqlite_master", rowname):
   ##    echo "database has some tables because first column = ", rowname.getInt(0)
   ##  do:
   ##    echo "we have a fresh database"
-  ## 
+  ##
   if db.loggerproc != nil: db.loggerproc(db, sql, 0)
   let preparedstatement = prepareSql(db, sql.cstring)
   try:
@@ -442,7 +442,7 @@ template withRowOr*(db: SQLiteral, sql: string, row, body1, body2: untyped) =
     discard finalize(preparedstatement)
 
 
-template withRow*(db: SQLiteral, statement: enum, params: varargs[DbValue, toDb], row, body: untyped) {.dirty.} =
+template withRow*(db: SQLiteral, statement: enum, params: varargs[DbValue, toDb], row, body: untyped) =
   ## | Executes given statement.
   ## | Name for the prepared statement is given with row parameter.
   ## | The code block will be executed only if query returns a row.
@@ -588,13 +588,13 @@ proc isIntransaction*(db: SQLiteral): bool {.inline.} =
 proc setLogger*(db: var SQLiteral, logger: proc(sqliteral: SQLiteral, statement: string, code: int)
  {.gcsafe, raises: [].}, paramtruncat = 50) =
   ## Set callback procedure to gather all executed statements with their parameters.
-  ## 
+  ##
   ## If code == 10000, log concerns internal sqliteral error.
   ##
   ## If code > 0, log concerns sqlite error with error code in question.
   ##
   ## If code == 0, log concerns normal operation.
-  ## 
+  ##
   ## If code == -1, log is mainly for debugging purposes.
   ##
   ## Paramtruncat parameter limits the maximum log length of parameters so that long inputs won't
@@ -614,53 +614,53 @@ proc setOnCommitCallback*(db: var SQLiteral, oncommit: proc(sqliteral: SQLiteral
 proc openDatabase*(db: var SQLiteral, dbname: string, schemas: openArray[string],
  maxKbSize = 0, wal = true, ignorableschemaerrors: openArray[string] = @["duplicate column name", "no such column"]) =
   ## Opens an exclusive connection, boots up the database, executes given schemas and prepares given statements.
-  ## 
+  ##
   ## If dbname is not a path, current working directory will be used.
-  ## 
+  ##
   ## | If wal = true, database is opened in WAL mode with NORMAL synchronous setting.
   ## | If wal = false, database is opened in PERSIST mode with FULL synchronous setting.
   ## | https://www.sqlite.org/wal.html
   ## | https://www.sqlite.org/pragma.html#pragma_synchronous
-  ## 
+  ##
   ## If maxKbSize == 0, database size is limited only by OS or hardware with possibly severe consequences.
   ##
   ## `ignorableschemaerrors` is a list of error message snippets for sql errors that are to be ignored.
   ## If a clause may error, it must be given in a separate schema as its unique clause.
   ## If * is given as ignorable error, it means that all errors will be ignored.
-  ## 
+  ##
   ## Note that by default, "duplicate column name" (ADD COLUMN) and "no such column" (DROP COLUMN) -errors will be ignored.
   ## Example below.
   ##
   ## .. code-block:: Nim
-  ## 
+  ##
   ##  # nim r -d:Maxdatabases=4 example.nim
   ##  import sqliteral
-  ##  
+  ##
   ##  const
   ##    Schema1 = "CREATE TABLE IF NOT EXISTS Example(data TEXT NOT NULL) STRICT"
   ##    Schema2 = "this is crap"
   ##    Schema3 = "ALTER TABLE Example ADD COLUMN newcolumn TEXT"
   ##    Schema4 = "ALTER TABLE Example ADD COLUMN newcolumn TEXT"
-  ##   
+  ##
   ##  var db1, db2, db3: SQLiteral
-  ##  
+  ##
   ##  proc logger(db: SQLiteral, msg: string, code: int) = echo msg
   ##  db1.setLogger(logger); db2.setLogger(logger); db3.setLogger(logger)
-  ##  
+  ##
   ##  # this will succeed because extra ADD COLUMNs are ignored:
   ##  db1.openDatabase("example1.db", [Schema1, Schema3, Schema4]); db1.close()
-  ##  
+  ##
   ##  # this will succeed because suitable ignorableschemaerrors are given:
   ##  db2.openDatabase("example2.db", [Schema1, Schema2],
   ##    ignorableschemaerrors = ["""this": syntax error"""]); db2.close()
-  ##  
-  ##  # this will succeed because all schema errors are ignored:  
+  ##
+  ##  # this will succeed because all schema errors are ignored:
   ##  db3.openDatabase("example1.db", [Schema1, Schema2, Schema3],
   ##    ignorableschemaerrors = ["*"]); db3.close()
-  ##  
+  ##
   ##  # this will fail because Schema 2 has syntax error:
   ##  db1.openDatabase("example1.db", [Schema1, Schema2])
-  ##  
+  ##
   doAssert dbname != ""
   withLock(openlock):
     if nextdbindex == MaxDatabases: raiseAssert("Cannot open more than " & $MaxDatabases & " databases. Increase the MaxDatabases intdefine.")
@@ -669,7 +669,7 @@ proc openDatabase*(db: var SQLiteral, dbname: string, schemas: openArray[string]
   initLock(db.transactionlock)
   db.dbname = dbname
   db.checkRc(open(dbname, db.sqlite))
- 
+
   db.exes("PRAGMA encoding = 'UTF-8'")
   db.exes("PRAGMA foreign_keys = ON")
   db.exes("PRAGMA locking_mode = EXCLUSIVE")
@@ -714,16 +714,16 @@ proc finalizeAllStatements() =
 
 proc setReadonly*(db: var SQLiteral, readonly: bool) =
   ## When in readonly mode:
-  ## 
+  ##
   ## 1) All transactions will be silently discarded
-  ## 
+  ##
   ## 2) Journal mode is changed to PERSIST in order to be able to change locking mode
-  ## 
+  ##
   ## 3) Locking mode is changed from EXCLUSIVE to NORMAL, allowing other connections access the database
-  ## 
+  ##
   ## Setting readonly fails with exception "cannot change into wal mode from within a transaction"
   ## when a statement is being executed, for example a result of a select is being iterated.
-  ## 
+  ##
   ## ``inreadonlymode`` property tells current mode.
   if readonly == db.inreadonlymode: return
   db.transactionsDisabled:
@@ -741,9 +741,9 @@ proc setReadonly*(db: var SQLiteral, readonly: bool) =
 
 proc optimize*(db: var SQLiteral, pagesize = -1, walautocheckpoint = -1) =
   ## Vacuums and optimizes the database.
-  ## 
+  ##
   ## This proc should be run just before closing, when no other thread accesses the database.
-  ## 
+  ##
   ## | In addition, database read/write performance ratio may be adjusted with parameters:
   ## | https://sqlite.org/pragma.html#pragma_page_size
   ## | https://www.sqlite.org/pragma.html#pragma_wal_checkpoint
@@ -766,7 +766,7 @@ proc optimize*(db: var SQLiteral, pagesize = -1, walautocheckpoint = -1) =
 proc initBackup*(db: var SQLiteral, backupfilename: string):
  tuple[backupdb: Psqlite3, backuphandle: PSqlite3_Backup] =
   ## Initializes backup processing, returning variables to use with `stepBackup` proc.
-  ## 
+  ##
   ## Note that `close` will fail with SQLITE_BUSY if there's an unfinished backup process going on.
   db.checkRc(open(backupfilename, result.backupdb))
   db.transactionsDisabled:
@@ -780,21 +780,21 @@ proc stepBackup*(db: var SQLiteral, backupdb: Psqlite3, backuphandle: PSqlite3_B
   ## Backs up a portion of the database pages (default: 5) to a destination initialized with `initBackup`.
   ##
   ## Returns percentage of progress; 100% means that backup has been finished.
-  ## 
+  ##
   ## The idea `(check example 2)<https://sqlite.org/backup.html>`_ is to put the thread to sleep
   ## between portions so that other operations can proceed concurrently.
   ##
   ## **Example:**
-  ## 
+  ##
   ## .. code-block:: Nim
   ##
-  ##  from os import sleep 
+  ##  from os import sleep
   ##  let (backupdb , backuphandle) = db.initBackup("./backup.db")
   ##  var progress: int
   ##  while progress < 100:
   ##    sleep(250)
   ##    progress = db.stepBackup(backupdb, backuphandle)
-  ## 
+  ##
   if unlikely(backupdb == nil or backuphandle == nil): db.checkRc(SQLITE_NULL)
   var rc = backup_step(backuphandle, pagesperportion)
   if rc == SQLITE_DONE:
@@ -855,11 +855,11 @@ else:
 proc getStatus*(db: SQLiteral, status: int, resethighest = false): (int, int) =
   ## Retrieves queried status info.
   ## See https://www.sqlite.org/c3ref/c_dbstatus_options.html
-  ## 
+  ##
   ## **Example:**
-  ## 
+  ##
   ## .. code-block:: Nim
-  ## 
+  ##
   ##    const SQLITE_DBSTATUS_CACHE_USED = 1
   ##    echo "current cache usage: ", db.getStatus(SQLITE_DBSTATUS_CACHE_USED)[0]
   var c, h: int32
