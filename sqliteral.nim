@@ -451,8 +451,8 @@ template withRow*(db: SQLiteral, statement: enum, params: varargs[DbValue, toDb]
   defer: discard reset(s)
   checkRc(db, bindParams(s, params))
   if step(s) == SQLITE_ROW:
-   var row {.inject.} = s
-   body
+    var row {.inject.} = s
+    body
 
 
 template withRowOr*(db: SQLiteral, statement: enum, params: varargs[DbValue, toDb], row, body1, body2: untyped) =
