@@ -1,8 +1,8 @@
-const SQLiteralVersion* = "5.0.0"
+const SQLiteralVersion* = "5.0.1"
 static: doAssert(compileOption("threads"))
 when not defined(nimdoc) and not defined(gcDestructors): {.fatal: "mm:arc or mm:orc required".}
 
-# (C) Olli Niinivaara, 2020-2024
+# (C) Olli Niinivaara, 2020-2025
 # MIT Licensed
 
 ## A high level SQLite API with support for multi-threading, prepared statements,

@@ -8,6 +8,9 @@ zero-copy data paths, debugging, optimizing, backups, and more...
 
 http://olliNiinivaara.github.io/SQLiteral/
 
+## 5.0.1 Release notes (2025-02-13)
+* `withRow` template fix by removing a superfluous `dirty` pragma
+
 ## 5.0.0 Release notes (2024-12-22)
  * statements from more than one enum list can be used
  * a statement is prepared automatically on first use
