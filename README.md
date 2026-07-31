@@ -30,7 +30,7 @@ db.close()
 
 http://olliNiinivaara.github.io/SQLiteral/
 
-## 6.0.0 Release notes (2026-07-28)
+## 6.0.0 Release notes (2026-07-31)
 
 ### Breaking changes
 * `inreadonlymode` property  and `setReadonly` proc are deprecated. Moreover, `setReadonly` does not execute any pragmas anymore, it only internally starts skipping all transactions.
