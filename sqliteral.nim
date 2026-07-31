@@ -1,8 +1,8 @@
-const SQLiteralVersion* = "5.0.1"
+const SQLiteralVersion* = "6.0"
 static: doAssert(compileOption("threads"))
-when not defined(nimdoc) and not defined(gcDestructors): {.fatal: "mm:arc or mm:orc required".}
+when not defined(nimdoc) and not defined(gcDestructors): {.fatal: "--mm:arc or --mm:atomicArc or --mm:orc required".}
 
-# (C) Olli Niinivaara, 2020-2025
+# (C) Olli Niinivaara, 2020-2026
 # MIT Licensed
 
 ## A high level SQLite API with support for multi-threading, prepared statements,
@@ -100,9 +100,9 @@ when defined(staticSqlite) and not defined(disableSqliteoptions):
 
 import db_connector/sqlite3
 export PStmt, errmsg, reset, step, finalize, SQLITE_ROW
-import locks
-from os import getFileSize
-from strutils import strip, split, contains, replace
+import std/locks
+from std/os import getFileSize
+from std/strutils import strip, split, contains, replace
 
 const
   MaxStatements* {.intdefine.} = 200
@@ -119,11 +119,12 @@ type
   SQLiteral* = object
     sqlite*: PSqlite3
     dbname*: string
-    inreadonlymode*: bool
+    inreadonlymode* {.deprecated.}: bool
     backupsinprogress*: int
     index: int
     intransaction: bool
     walmode: bool
+    exclusivemode: bool
     maxsize: int
     transactionlock: Lock
     loggerproc: proc(sqliteral: SQLiteral, statement: string, errorcode: int) {.gcsafe, raises: [].}
@@ -275,8 +276,13 @@ proc doLog*(db: SQLiteral, statement: string, params: varargs[DbValue, toDb]) {.
 #-----------------------------------------------------------------------------------------------------------
 
 proc getInt*(prepared: PStmt, col: int32 = 0): int64 {.inline.} =
-  ## Returns value of INTEGER -type column at given column index
+  ## Returns value of INTEGER -type column at given column index as int64
   return column_int64(prepared, col)
+
+
+proc getInt32*(prepared: PStmt, col: int32 = 0): int32 {.inline.} =
+  ## Returns value of INTEGER -type column at given column index as int32
+  return column_int(prepared, col)
 
 
 proc getString*(prepared: PStmt, col: int32 = 0): string {.inline.} =
@@ -338,6 +344,15 @@ proc getTheInt*(db: SQLiteral, statement: enum, params: varargs[DbValue, toDb]):
   if step(s) == SQLITE_ROW: s.getInt(0) else: -2147483647
 
 
+proc getTheInt32*(db: SQLiteral, statement: enum, params: varargs[DbValue, toDb]): int32 {.inline.} =
+  ## Same as getTheInt, but returns value as int32
+  if db.loggerproc != nil: log()
+  let s = db.getStatement(statement)
+  checkRc(db, bindParams(s, params))
+  defer: discard sqlite3.reset(s)
+  if step(s) == SQLITE_ROW: s.getInt32(0) else: -2147483647
+
+
 proc getTheInt*(db: SQLiteral, s: string): int64 {.inline.} =
   ## | Dynamically prepares, executes and finalizes given query and returns value of INTEGER -type
   ## column at column index 0 of first result row.
@@ -349,6 +364,18 @@ proc getTheInt*(db: SQLiteral, s: string): int64 {.inline.} =
     let rc = step(query)
     checkRc(db, rc)
     result = if rc == SQLITE_ROW: query.getInt(0) else: -2147483647
+  finally:
+    discard finalize(query)
+
+
+proc getTheInt32*(db: SQLiteral, s: string): int32 {.inline.} =
+  ## Same as getTheInt, but returns value as int32
+  if db.loggerproc != nil: db.loggerproc(db, s, 0)
+  let query = db.prepareSql(s)
+  try:
+    let rc = step(query)
+    checkRc(db, rc)
+    result = if rc == SQLITE_ROW: query.getInt32(0) else: -2147483647
   finally:
     discard finalize(query)
 
@@ -402,6 +429,43 @@ proc rowExists*(db: SQLiteral, sql: string): bool {.inline.} =
   return step(preparedstatement) == SQLITE_ROW
 
 
+template withRow*(db: SQLiteral, statement: enum, params: varargs[DbValue, toDb], row, body: untyped) =
+  ## | Executes given statement.
+  ## | Name for the prepared statement is given with row parameter.
+  ## | The code block will be executed only if query returns a row.
+  ## **Example:**
+  ##
+  ## .. code-block:: Nim
+  ##
+  ##  var testresult = -1.int32
+  ##  db.withRow(SomeSelectStatement, columnname, nameforresultrow):
+  ##    testresult = nameforresultrow.getInt32(columnnindex)
+  ##  return testresult == 100
+  if db.loggerproc != nil: doLog(db, $statement, params)
+  let s = db.getStatement(statement)
+  defer: discard reset(s)
+  checkRc(db, bindParams(s, params))
+  if step(s) == SQLITE_ROW:
+    var row {.inject.} = s
+    body
+
+
+template withRowOr*(db: SQLiteral, statement: enum, params: varargs[DbValue, toDb], row, body1, body2: untyped) =
+  ## | Executes given statement.
+  ## | Name for the prepared statement is given with row parameter.
+  ## | First block will be executed if query returns a row, otherwise the second block.
+  if db.loggerproc != nil: doLog(db, $statement, params)
+  let s = db.getStatement(statement)
+  checkRc(db, bindParams(s, params))
+  try:
+    if step(s) == SQLITE_ROW:
+      var row {.inject.} = s
+      body1
+    else: body2
+  finally:
+    discard sqlite3.reset(s)
+
+
 template withRow*(db: SQLiteral, sql: string, row, body: untyped) =
   ## | Dynamically prepares and finalizes an sql query.
   ## | Name for the resulting prepared statement is given with row parameter.
@@ -440,35 +504,6 @@ template withRowOr*(db: SQLiteral, sql: string, row, body1, body2: untyped) =
     else: body2
   finally:
     discard finalize(preparedstatement)
-
-
-template withRow*(db: SQLiteral, statement: enum, params: varargs[DbValue, toDb], row, body: untyped) =
-  ## | Executes given statement.
-  ## | Name for the prepared statement is given with row parameter.
-  ## | The code block will be executed only if query returns a row.
-  if db.loggerproc != nil: doLog(db, $statement, params)
-  let s = db.getStatement(statement)
-  defer: discard reset(s)
-  checkRc(db, bindParams(s, params))
-  if step(s) == SQLITE_ROW:
-    var row {.inject.} = s
-    body
-
-
-template withRowOr*(db: SQLiteral, statement: enum, params: varargs[DbValue, toDb], row, body1, body2: untyped) =
-  ## | Executes given statement.
-  ## | Name for the prepared statement is given with row parameter.
-  ## | First block will be executed if query returns a row, otherwise the second block.
-  if db.loggerproc != nil: doLog(db, $statement, params)
-  let s = db.getStatement(statement)
-  checkRc(db, bindParams(s, params))
-  try:
-    if step(s) == SQLITE_ROW:
-      var row {.inject.} = s
-      body1
-    else: body2
-  finally:
-    discard sqlite3.reset(s)
 
 #-----------------------------------------------------------------------------------------------------------
 
@@ -550,6 +585,7 @@ template transaction*(db: var SQLiteral, body: untyped) =
   ## | Every write to database must happen inside some transaction.
   ## | Groups of reads must be wrapped in same transaction if mutual consistency required.
   ## | In WAL mode (the default), independent reads must NOT be wrapped in transaction to allow parallel processing.
+  {.push warning[Deprecated]: off.}
   if not db.inreadonlymode:
     acquire(db.transactionlock)
     exec(db, db.Transaction)
@@ -568,6 +604,7 @@ template transaction*(db: var SQLiteral, body: untyped) =
         db.intransaction = false
         if db.loggerproc != nil: db.loggerproc(db, "--- COMMIT", 0)
       release(db.transactionlock)
+  {.pop.}
 
 
 template transactionsDisabled*(db: var SQLiteral, body: untyped) =
@@ -612,15 +649,18 @@ proc setOnCommitCallback*(db: var SQLiteral, oncommit: proc(sqliteral: SQLiteral
 # -------------------------------------------------------------------------------------------------------------
 
 proc openDatabase*(db: var SQLiteral, dbname: string, schemas: openArray[string],
- maxKbSize = 0, wal = true, ignorableschemaerrors: openArray[string] = @["duplicate column name", "no such column"]) =
-  ## Opens an exclusive connection, boots up the database, executes given schemas and prepares given statements.
+ maxKbSize = 0, wal = true, exclusive = true, ignorableschemaerrors: openArray[string] = @["duplicate column name", "no such column"]) =
+  ## Opens a connection, boots up the database, executes given schemas and prepares given statements.
   ##
   ## If dbname is not a path, current working directory will be used.
   ##
-  ## | If wal = true, database is opened in WAL mode with NORMAL synchronous setting.
+  ## | If wal = true (default), database is opened in WAL mode with NORMAL synchronous setting.
   ## | If wal = false, database is opened in PERSIST mode with FULL synchronous setting.
   ## | https://www.sqlite.org/wal.html
   ## | https://www.sqlite.org/pragma.html#pragma_synchronous
+  ##
+  ## | If exclusive = true (default), connection locking mode is set to EXCLUSIVE (for slightly better performance)
+  ## | If exclusive = false, connection locking mode is set to NORMAL (allowing other processes to establish concurrent connections to the database)
   ##
   ## If maxKbSize == 0, database size is limited only by OS or hardware with possibly severe consequences.
   ##
@@ -669,10 +709,10 @@ proc openDatabase*(db: var SQLiteral, dbname: string, schemas: openArray[string]
   initLock(db.transactionlock)
   db.dbname = dbname
   db.checkRc(open(dbname, db.sqlite))
-
+  db.exclusivemode = exclusive
+  if exclusive: db.exes("PRAGMA locking_mode = EXCLUSIVE")
   db.exes("PRAGMA encoding = 'UTF-8'")
   db.exes("PRAGMA foreign_keys = ON")
-  db.exes("PRAGMA locking_mode = EXCLUSIVE")
   db.walmode = wal
   if wal: db.exes("PRAGMA journal_mode = WAL")
   else:
@@ -695,13 +735,9 @@ proc openDatabase*(db: var SQLiteral, dbname: string, schemas: openArray[string]
   if db.loggerproc != nil: db.loggerproc(db, db.dbname & " opened", -1)
 
 
-proc openDatabase*(db: var SQLiteral, dbname: string, schema: string, maxKbSize = 0, wal = true) {.inline.} =
+proc openDatabase*(db: var SQLiteral, dbname: string, schema: string, maxKbSize = 0, wal = true, exclusive = true) {.inline.} =
   ## Open database with a single schema.
-  openDatabase(db, dbname, [schema], maxKbSize, wal, @["duplicate column name", "no such column"])
-
-
-proc prepareStatements*(db: var SQLiteral, statements: typedesc[enum]) {.deprecated: "Preparations happen automatically.".} = discard
-proc finalizeStatements*() {.deprecated: "Finalizations happen automatically.".} = discard
+  openDatabase(db, dbname, [schema], maxKbSize, wal, exclusive, @["duplicate column name", "no such column"])
 
 
 proc finalizeAllStatements() =
@@ -712,31 +748,15 @@ proc finalizeAllStatements() =
         threadpreparedstatements[][i] = nil
 
 
-proc setReadonly*(db: var SQLiteral, readonly: bool) =
-  ## When in readonly mode:
-  ##
-  ## 1) All transactions will be silently discarded
-  ##
-  ## 2) Journal mode is changed to PERSIST in order to be able to change locking mode
-  ##
-  ## 3) Locking mode is changed from EXCLUSIVE to NORMAL, allowing other connections access the database
-  ##
-  ## Setting readonly fails with exception "cannot change into wal mode from within a transaction"
-  ## when a statement is being executed, for example a result of a select is being iterated.
-  ##
-  ## ``inreadonlymode`` property tells current mode.
+proc setReadonly*(db: var SQLiteral, readonly: bool) {.deprecated.} =
+  {.push warning[Deprecated]: off.}
+  ## When in readonly mode, all transactions made by this process are silently ignored
+  ## ``inreadonlymode`` property tells the current mode.
   if readonly == db.inreadonlymode: return
   db.transactionsDisabled:
-    if readonly:
-      db.inreadonlymode = readonly
-      db.exes("PRAGMA journal_mode = PERSIST")
-      db.exes("PRAGMA locking_mode = NORMAL")
-      db.exes("SELECT (1) FROM sqlite_master") #  dummy access to release file lock
-    else:
-      if db.walmode: db.exes("PRAGMA journal_mode = WAL")
-      db.exes("PRAGMA locking_mode = EXCLUSIVE") # next write will keep the file lock
-      db.inreadonlymode = readonly
+    db.inreadonlymode = readonly
     if db.loggerproc != nil: db.loggerproc(db, "--- READONLY MODE: " & $readonly , 0)
+  {.pop.}
 
 
 proc optimize*(db: var SQLiteral, pagesize = -1, walautocheckpoint = -1) =
@@ -825,25 +845,29 @@ proc inMemory(db: SQLiteral): bool =
   db.dbname == ":memory:"
 
 
-proc about*(db: SQLiteral) =
-  ## Echoes some info about the database.
-  echo ""
-  echo db.dbname & ": "
-  echo "SQLiteral=", SQLiteralVersion
-  echo "SQLite=", libversion()
-  echo "Userversion=", db.getTheString("PRAGMA user_version")
+proc about*(db: SQLiteral, tolog = false) =
+  ## outputs some info about the database.
+  ## if tolog = false (default), echoes to stdout. If tolog = true and loggerproc is set, sends to logger procedure.
+  proc print(line: string) = (if tolog and db.loggerproc != nil: doLog(db, line) else: echo line)
+  if not tolog: print ""
+  print db.dbname & ": "
+  print "SQLiteral=" & SQLiteralVersion
+  print "SQLite=" & $libversion()
+  print "Userversion=" & db.getTheString("PRAGMA user_version")
+  print "Walmode=" & $db.walmode
+  print "Exclusivemode=" & $db.exclusivemode
   let Get_options = db.prepareSql("PRAGMA compile_options")
-  for row in db.rows(Get_options): echo row.getString()
+  for row in db.rows(Get_options): print row.getString()
   discard finalize(Get_options)
-  echo "Pagesize=", $db.getTheInt("PRAGMA page_size")
-  echo "WALautocheckpoint=", $db.getTheInt("PRAGMA wal_autocheckpoint")
+  print "Pagesize=" & $db.getTheInt("PRAGMA page_size")
+  print "WALautocheckpoint=" & $db.getTheInt("PRAGMA wal_autocheckpoint")
   if not db.inMemory:
     let filesize = getFileSize(db.dbname)
-    echo "Filesize=", filesize
+    print "Filesize=" & $filesize
     if db.maxsize > 0:
-      echo "Maxsize=", db.maxsize * 1024
-      echo "Sizeused=", (filesize div ((db.maxsize.float * 10.24).int)), "%"
-  echo ""
+      print "Maxsize=" & $(db.maxsize * 1024)
+      print "Sizeused=" & $(filesize div ((db.maxsize.float * 10.24).int)) & "%"
+  if not tolog: print ""
 
 
 when defined(staticSqlite):
@@ -877,15 +901,14 @@ proc interrupt*(db: var SQLiteral) =
   callInterrupt(db.sqlite)
 
 
-proc close*(db: var SQLiteral) =
-  ## Closes the database.
+proc doClose(db: var SQLiteral, temporary = false) =
   if db.Transaction == nil:
     if db.loggerproc != nil: db.loggerproc(db, "already closed: " & db.dbname, 10000)
     return
   if db.backupsinprogress > 0:
     raise SQLError(msg: "Cannot close, backups still in progress: " & $db.backupsinprogress, rescode: SQLITE_BUSY)
   var rc = 0
-  acquire(db.transactionlock)
+  if not temporary: acquire(db.transactionlock)
   try:
     discard db.Transaction.finalize()
     discard db.Commit.finalize()
@@ -894,11 +917,37 @@ proc close*(db: var SQLiteral) =
     rc = close(db.sqlite)
     if rc == SQLITE_OK:
       db.Transaction = nil
-      if db.loggerproc != nil: db.loggerproc(db, db.dbname & " closed", 0)
+      if not temporary and db.loggerproc != nil: db.loggerproc(db, db.dbname & " closed", 0)
     else: db.checkRc(rc)
   except:
     if db.loggerproc != nil: db.loggerproc(db, getCurrentExceptionMsg(), 10000)
     raise SQLError(msg: getCurrentExceptionMsg(), rescode: 10000)
   finally:
-    release(db.transactionlock)
-    if db.Transaction == nil: deinitLock(db.transactionlock)
+    if not temporary:
+      release(db.transactionlock)
+      if db.Transaction == nil: deinitLock(db.transactionlock)
+
+
+proc close*(db: var SQLiteral) =
+  ## Closes the database.
+  db.doClose()
+
+proc setExclusivemode*(db: var SQLiteral, exclusive: bool) =
+  ## Changes the connection locking mode of the database:
+  ##   If exclusive = true, locking mode is set to EXCLUSIVE (file locks will not be released, preventing access from other processes and gaining slightly better performance)
+  ##   If exclusive = false, locking mode is set to NORMAL (allowing other processes to make concurrent connections to the database)
+  ## When entering NORMAL mode, the database is closed and re-opened in order to release existing file locks.
+  if exclusive == db.exclusivemode: return
+  if exclusive:
+    db.transactionsDisabled:
+      db.exes("PRAGMA locking_mode = EXCLUSIVE")
+      if db.loggerproc != nil: db.loggerproc(db, db.dbname & " locking mode set to EXCLUSIVE ", 0)
+  else:
+    db.transactionsDisabled:
+      db.doClose(temporary = true)
+      db.checkRc(open(cstring(db.dbname), db.sqlite))
+      db.Transaction = db.prepareSql("BEGIN IMMEDIATE".cstring)
+      db.Commit = db.prepareSql("COMMIT".cstring)
+      db.Rollback = db.prepareSql("ROLLBACK".cstring)
+      if db.loggerproc != nil: db.loggerproc(db, db.dbname & " locking mode set to NORMAL ", 0)
+  db.exclusivemode = exclusive
