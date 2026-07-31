@@ -37,7 +37,7 @@ http://olliNiinivaara.github.io/SQLiteral/
 
 ### Other
 * new `setExclusivemode` proc for changing the database connection locking mode between NORMAL and EXCLUSIVE
-* `open` proc accepts a new `exclusive` boolean parameter for setting database connection locking mode: true (default) = EXCLUSIVE, false = NORMAL
+* `openDatabase` proc accepts a new `exclusive` boolean parameter for setting database connection locking mode: true (default) = EXCLUSIVE, false = NORMAL
 * new `getInt32` and `getTheInt32` getters
 * `about` proc accepts a new `tolog` boolean parameter. if false (default), info is echoed to stdout. If true, info is sent to logger procedure.
 
